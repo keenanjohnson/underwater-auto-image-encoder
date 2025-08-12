@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# Large image files (but not directories themselves)
+*.gpr
+*.GPR
+*.jpg
+*.jpeg
+*.png
+*.dng
+*.raw
+
+# Models
+models/
+checkpoints/
+*.h5
+*.pkl
+*.pth
+*.ckpt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Documentation
+*.md
+LICENSE
+docs/
+
+# Dev container
+.devcontainer/
