@@ -47,3 +47,17 @@ When implementing the autoencoder, consider:
 ## Resources
 - Active discussion on approaches: https://github.com/Seattle-Aquarium/CCR_development/issues/29
 - Example input/output files: https://github.com/Seattle-Aquarium/CCR_development/tree/rmt_edits/files/ML_image_processing
+
+## Project TODO List
+
+The project maintains a TODO.md file with the following tasks:
+1. ✓ Set up VS Code dev container for isolated development environment
+2. Create GPR to RAW conversion and cropping automation script
+3. Select ML framework (TensorFlow or PyTorch)
+4. Design autoencoder model architecture
+5. Implement autoencoder model
+6. Train autoencoder on preprocessed dataset
+7. Evaluate model performance and adjust
+8. Integrate trained model into processing pipeline
+
+Note: Check TODO.md for the latest status of each task.
