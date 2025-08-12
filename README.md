@@ -5,7 +5,8 @@ replace a manual image editing process for enhncing underwater images.
 
 ## Dataset
 
-There is a good manually edited input dataset that has been manually edited by the Seattle aquarium staff. This dataset includes both the unprocessed GPR files and the corresponding processed JPEG outputs.
+There is a good manually edited input dataset that has been manuall
+ edited by the Seattle aquarium staff. This dataset includes both the unprocessed GPR files and the corresponding processed JPEG outputs.
 
 ## General Steps for Output Processing
 
