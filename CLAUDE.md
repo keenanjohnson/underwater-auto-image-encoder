@@ -47,6 +47,10 @@ When implementing the autoencoder, consider:
 ## Resources
 - Active discussion on approaches: https://github.com/Seattle-Aquarium/CCR_development/issues/29
 - Example input/output files: https://github.com/Seattle-Aquarium/CCR_development/tree/rmt_edits/files/ML_image_processing
+- Examples of similar encoders:
+  - U-shape Transformer for Underwater Image Enhancement: https://github.com/LintaoPeng/U-shape_Transformer_for_Underwater_Image_Enhancements
+  - Underwater Image Enhancement via Medium Transmission-Guided Multi-Color Space Embedding: https://li-chongyi.github.io/Proj_Ucolor.html
+  - Semi-UIR: https://github.com/Huang-ShiRui/Semi-UIR
 
 ## Project TODO List
 
