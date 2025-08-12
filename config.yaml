@@ -1,0 +1,70 @@
+# Configuration for Underwater Image Enhancement Model
+
+# Model Configuration
+model:
+  type: "LightweightUNet"  # Options: UNetAutoencoder, LightweightUNet
+  n_channels: 3
+  n_classes: 3
+  base_features: 32
+  bilinear: false
+
+# Data Configuration
+data:
+  input_dir: "processed/cropped"
+  target_dir: "processed/enhanced"
+  input_ext: ".tiff"
+  target_ext: ".jpg"
+  batch_size: 4
+  num_workers: 4
+  train_split: 0.8
+  image_size: [512, 512]  # Resize for training (full res too memory intensive)
+
+# Training Configuration
+training:
+  epochs: 100
+  learning_rate: 0.001
+  lr_scheduler: "cosine"  # Options: cosine, step, exponential
+  optimizer: "adam"  # Options: adam, sgd, adamw
+  weight_decay: 0.0001
+  gradient_clip: 1.0
+  
+  # Loss weights
+  loss:
+    lambda_pixel: 1.0
+    lambda_perceptual: 0.1
+    lambda_color: 0.5
+    lambda_ssim: 0.5
+
+# Validation Configuration
+validation:
+  interval: 5  # Validate every N epochs
+  save_best: true
+  metrics:
+    - "psnr"
+    - "ssim"
+    - "mae"
+
+# Checkpoint Configuration
+checkpoint:
+  save_dir: "checkpoints"
+  save_interval: 10
+  keep_last_n: 3
+
+# Logging Configuration
+logging:
+  log_dir: "logs"
+  tensorboard: true
+  log_interval: 10  # Log every N batches
+
+# Hardware Configuration
+hardware:
+  device: "cuda"  # Options: cuda, cpu
+  mixed_precision: false
+  cudnn_benchmark: true
+
+# Inference Configuration
+inference:
+  checkpoint_path: null  # Path to checkpoint for inference
+  output_dir: "output"
+  resize_inference: false  # Whether to resize during inference
+  batch_size: 1
