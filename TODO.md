@@ -1,6 +1,6 @@
 This is the project todo list.
 
-[] Set up the local development environment using vscode dev containers to keep dependencies isolated and ensure a consistent development environment across different machines.
+[x] Set up the local development environment using vscode dev containers to keep dependencies isolated and ensure a consistent development environment across different machines.
 [] Create a script for automating the preprocessing steps, including GPR to RAW conversion and image cropping.
 [] Select the ML framework (e.g., TensorFlow, PyTorch) for building the autoencoder.
 [] Design the autoencoder model architecture.
