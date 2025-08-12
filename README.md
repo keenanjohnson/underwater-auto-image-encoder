@@ -8,6 +8,9 @@ replace a manual image editing process for enhncing underwater images.
 There is a good manually edited input dataset that has been manuall
  edited by the Seattle aquarium staff. This dataset includes both the unprocessed GPR files and the corresponding processed JPEG outputs.
 
+
+ The dataset is found in the training_data/ directory which is placed there manually by the user on their local computer.
+
 ## General Steps for Output Processing
 
 The goal is to have a program that can:
