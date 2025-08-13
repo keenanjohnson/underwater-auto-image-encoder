@@ -37,7 +37,7 @@ python preprocess_images.py /path/to/gpr/files --output-dir processed
 #### 2. Prepare Training Dataset
 ```bash
 # Organize paired raw/enhanced images for training
- python ./prepare_dataset.py ./training_data/input_GPR/ ./training_data/human_output_jpeg/ --output dataset
+python ./prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
 
 # Creates organized dataset structure:
 # dataset/input/   - Raw images (renamed consistently)
