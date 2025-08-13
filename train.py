@@ -108,7 +108,8 @@ class Trainer:
             batch_size=self.config['data']['batch_size'],
             num_workers=self.config['data']['num_workers'],
             train_split=self.config['data']['train_split'],
-            transform=transform
+            transform=transform,
+            pin_memory=self.device.type == 'cuda'
         )
         
         logger.info(f"Data loaders created:")

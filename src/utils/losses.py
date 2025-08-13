@@ -16,7 +16,7 @@ class PerceptualLoss(nn.Module):
     def __init__(self, feature_layers: List[int] = [3, 8, 15, 22]):
         super(PerceptualLoss, self).__init__()
         
-        vgg = models.vgg16(pretrained=True).features
+        vgg = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1).features
         self.feature_extractor = nn.ModuleList()
         
         for layer_idx in feature_layers:

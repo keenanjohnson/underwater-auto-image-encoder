@@ -158,7 +158,8 @@ def create_data_loaders(input_dir: str,
                        batch_size: int = 4,
                        num_workers: int = 4,
                        train_split: float = 0.8,
-                       transform=None) -> Tuple[DataLoader, DataLoader]:
+                       transform=None,
+                       pin_memory: bool = None) -> Tuple[DataLoader, DataLoader]:
     """
     Create train and validation data loaders
     
@@ -169,6 +170,7 @@ def create_data_loaders(input_dir: str,
         num_workers: Number of data loading workers
         train_split: Fraction of data for training
         transform: Optional transforms
+        pin_memory: Whether to pin memory (auto-detected if None)
     
     Returns:
         Tuple of (train_loader, val_loader)
@@ -182,12 +184,16 @@ def create_data_loaders(input_dir: str,
         dataset, [train_size, val_size]
     )
     
+    # Auto-detect pin_memory based on CUDA availability
+    if pin_memory is None:
+        pin_memory = torch.cuda.is_available()
+    
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=pin_memory
     )
     
     val_loader = DataLoader(
@@ -195,7 +201,7 @@ def create_data_loaders(input_dir: str,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=pin_memory
     )
     
     return train_loader, val_loader
