@@ -10,12 +10,10 @@ model:
 
 # Data Configuration
 data:
-  input_dir: "dataset/input"
-  target_dir: "dataset/target"
+  input_dir: "dataset-1000/input"
+  target_dir: "dataset-1000/target"
   input_ext: ".tiff"
   target_ext: ".jpg"
-  batch_size: 4
-  num_workers: 4
   batch_size: 1  # Reduced for CPU training
   num_workers: 0  # Set to 0 for CPU training to avoid multiprocessing issues
   train_split: 0.8
