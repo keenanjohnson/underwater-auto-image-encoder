@@ -82,7 +82,13 @@ class Inferencer:
     def setup_transforms(self):
         """Setup image transformations"""
         if self.config.get('inference', {}).get('resize_inference', False):
-            image_size = tuple(self.config['data']['image_size'])
+            # Use inference_size if available, otherwise fall back to data image_size
+            inference_config = self.config.get('inference', {})
+            if 'inference_size' in inference_config:
+                image_size = tuple(inference_config['inference_size'])
+            else:
+                image_size = tuple(self.config['data']['image_size'])
+            
             self.transform = transforms.Compose([
                 transforms.Resize(image_size),
                 transforms.ToTensor()
@@ -94,22 +100,59 @@ class Inferencer:
             self.transform = transforms.ToTensor()
             self.inverse_transform = transforms.ToPILImage()
     
+    def pad_to_multiple(self, tensor, multiple=32):
+        """Pad tensor to be divisible by multiple"""
+        _, _, h, w = tensor.shape
+        
+        # Calculate padding needed
+        pad_h = (multiple - h % multiple) % multiple
+        pad_w = (multiple - w % multiple) % multiple
+        
+        # Pad to make divisible by multiple
+        if pad_h > 0 or pad_w > 0:
+            # Use reflection padding to avoid artifacts
+            padding = (0, pad_w, 0, pad_h)  # (left, right, top, bottom)
+            tensor = torch.nn.functional.pad(tensor, padding, mode='reflect')
+        
+        return tensor, (pad_h, pad_w)
+    
     def process_image(self, image_path: Path, output_path: Path = None):
         """Process a single image"""
         img = Image.open(image_path).convert('RGB')
         original_size = img.size
         
-        input_tensor = self.transform(img).unsqueeze(0).to(self.device)
+        # Check if we should resize during inference
+        resize_inference = self.config.get('inference', {}).get('resize_inference', False)
         
-        with torch.no_grad():
-            output_tensor = self.model(input_tensor)
-        
-        output_tensor = output_tensor.squeeze(0).cpu()
-        
-        output_img = self.inverse_transform(output_tensor)
-        
-        if not self.config.get('inference', {}).get('resize_inference', False):
+        if resize_inference:
+            # Use training resolution
+            input_tensor = self.transform(img).unsqueeze(0).to(self.device)
+            
+            with torch.no_grad():
+                output_tensor = self.model(input_tensor)
+            
+            output_tensor = output_tensor.squeeze(0).cpu()
+            output_img = self.inverse_transform(output_tensor)
+            
+            # Resize back to original size
             output_img = output_img.resize(original_size, Image.LANCZOS)
+        else:
+            # Process at original resolution with padding
+            input_tensor = self.transform(img).unsqueeze(0).to(self.device)
+            
+            # Pad to make dimensions compatible with U-Net
+            padded_tensor, (pad_h, pad_w) = self.pad_to_multiple(input_tensor, multiple=32)
+            
+            with torch.no_grad():
+                output_tensor = self.model(padded_tensor)
+            
+            # Remove padding from output
+            if pad_h > 0 or pad_w > 0:
+                _, _, h, w = input_tensor.shape
+                output_tensor = output_tensor[:, :, :h, :w]
+            
+            output_tensor = output_tensor.squeeze(0).cpu()
+            output_img = self.inverse_transform(output_tensor)
         
         if output_path:
             output_path.parent.mkdir(parents=True, exist_ok=True)
