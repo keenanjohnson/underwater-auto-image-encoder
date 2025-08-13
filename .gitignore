@@ -54,6 +54,11 @@ tensorboard/
 *.DNG
 *.raw
 *.RAW
+*.tiff
+
+# Processed
+processed/
+dataset/
 
 # IDE
 .vscode/
