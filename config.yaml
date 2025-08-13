@@ -16,8 +16,10 @@ data:
   target_ext: ".jpg"
   batch_size: 4
   num_workers: 4
+  batch_size: 1  # Reduced for CPU training
+  num_workers: 0  # Set to 0 for CPU training to avoid multiprocessing issues
   train_split: 0.8
-  image_size: [512, 512]  # Resize for training (full res too memory intensive)
+  image_size: [256, 256]  # Much smaller for CPU training (original: 4606x4030)
 
 # Training Configuration
 training:
@@ -66,5 +68,6 @@ hardware:
 inference:
   checkpoint_path: null  # Path to checkpoint for inference
   output_dir: "output"
-  resize_inference: false  # Whether to resize during inference
+  resize_inference: true  # Set to true for CPU inference (much faster)
+  inference_size: [1024, 1024]  # Reasonable size for CPU inference
   batch_size: 1
