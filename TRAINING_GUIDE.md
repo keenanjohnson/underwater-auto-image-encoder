@@ -5,7 +5,7 @@
 ### 1. Prepare Your Dataset
 ```bash
 # Organize your raw and enhanced image pairs
-python prepare_dataset.py /path/to/raw/images /path/to/enhanced/images --output dataset
+python ./prepare_dataset.py ./training_data/input_GPR/ ./training_data/human_output_jpeg/ --output dataset
 
 # This will create:
 # dataset/input/    - Raw images (renamed consistently)
