@@ -153,7 +153,8 @@ class GPRPreprocessor:
         Returns:
             List of (DNG path, cropped path) tuples
         """
-        gpr_files = list(input_dir.glob(pattern))
+        # Search for both lowercase and uppercase GPR files
+        gpr_files = list(input_dir.glob("*.gpr")) + list(input_dir.glob("*.GPR"))
         logger.info(f"Found {len(gpr_files)} GPR files")
         
         results = []
