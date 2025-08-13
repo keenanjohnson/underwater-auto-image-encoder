@@ -59,6 +59,7 @@ tensorboard/
 # Processed
 processed/
 dataset/
+dataset-*/
 
 # IDE
 .vscode/
