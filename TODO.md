@@ -5,6 +5,6 @@ This is the project todo list.
 [x] Select the ML framework (e.g., TensorFlow, PyTorch) for building the autoencoder.
 [x] Design the autoencoder model architecture.
 [x] Implement the autoencoder model architecture using the selected machine learning framework.
-[] Train the autoencoder model on the preprocessed dataset.
+[x] Train the autoencoder model on the preprocessed dataset.
 [] Evaluate the model's performance and make necessary adjustments.
 [] Integrate the trained model into the output processing pipeline.

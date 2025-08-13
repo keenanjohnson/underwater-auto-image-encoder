@@ -10,8 +10,8 @@ model:
 
 # Data Configuration
 data:
-  input_dir: "processed/cropped"
-  target_dir: "processed/enhanced"
+  input_dir: "dataset/input"
+  target_dir: "dataset/target"
   input_ext: ".tiff"
   target_ext: ".jpg"
   batch_size: 4
