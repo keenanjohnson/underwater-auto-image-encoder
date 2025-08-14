@@ -2,38 +2,34 @@
 
 # Model Configuration
 model:
-  type: "LightweightUNet"  # Options: UNetAutoencoder, LightweightUNet
-  n_channels: 3
-  n_classes: 3
-  base_features: 32
-  bilinear: false
+  n_channels: 3  # Input channels (RGB)
+  n_classes: 3   # Output channels (RGB)
+  # Standard U-Net with full feature progression: 64 → 128 → 256 → 512 → 1024
 
 # Data Configuration
 data:
-  input_dir: "dataset-1000/input"
-  target_dir: "dataset-1000/target"
-  input_ext: ".tiff"
+  input_dir: "dataset/input_GPR"
+  target_dir: "dataset/human_output_JPEG"
+  input_ext: ".GPR"
   target_ext: ".jpg"
-  batch_size: 1  # Reduced for CPU training
-  num_workers: 0  # Set to 0 for CPU training to avoid multiprocessing issues
+  batch_size: 16  # Standard batch size for GPU training
+  num_workers: 2  # Parallel data loading
   train_split: 0.8
-  image_size: [256, 256]  # Much smaller for CPU training (original: 4606x4030)
+  image_size: [256, 256]  # Balanced for quality and GPU memory
 
 # Training Configuration
 training:
-  epochs: 100
-  learning_rate: 0.001
-  lr_scheduler: "cosine"  # Options: cosine, step, exponential
-  optimizer: "adam"  # Options: adam, sgd, adamw
+  epochs: 50
+  learning_rate: 0.0001
+  lr_scheduler: "reduce_on_plateau"  # Reduces LR when validation loss plateaus
+  optimizer: "adam"
   weight_decay: 0.0001
   gradient_clip: 1.0
   
-  # Loss weights
+  # Loss configuration (Combined L1 + MSE)
   loss:
-    lambda_pixel: 1.0
-    lambda_perceptual: 0.1
-    lambda_color: 0.5
-    lambda_ssim: 0.5
+    l1_weight: 0.8  # L1 loss for sharp details
+    mse_weight: 0.2  # MSE loss for color consistency
 
 # Validation Configuration
 validation:
@@ -58,14 +54,13 @@ logging:
 
 # Hardware Configuration
 hardware:
-  device: "cuda"  # Options: cuda, cpu
-  mixed_precision: false
-  cudnn_benchmark: true
+  device: "cuda"  # Will auto-fallback to CPU if no GPU available
+  mixed_precision: false  # Keep false for training stability
+  cudnn_benchmark: true  # Optimize for consistent input sizes
 
 # Inference Configuration
 inference:
   checkpoint_path: null  # Path to checkpoint for inference
   output_dir: "output"
-  resize_inference: true  # Set to true for CPU inference (much faster)
-  inference_size: [1024, 1024]  # Reasonable size for CPU inference
-  batch_size: 1
+  batch_size: 1  # Process one image at a time for maximum quality
+  maintain_original_size: true  # Resize to model size, then back to original
