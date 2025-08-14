@@ -46,16 +46,24 @@ python ./prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jp
 ```
 
 #### 3. Train the Model
+
+**Option A: Local Training (CPU/GPU)**
 ```bash
-# Start training with default configuration
-python train.py --config config.yaml
+# Train with standard U-Net using config
+python train_unet.py
 
-# Monitor training progress
-tensorboard --logdir logs
-
-# Resume from checkpoint (if needed)
-python train.py --config config.yaml --resume checkpoints/checkpoint_epoch_10.pth
+# The script will:
+# - Load config.yaml settings
+# - Initialize Standard U-Net (~31M parameters)
+# - Use Combined L1+MSE loss (80%/20%)
+# - Auto-detect GPU/CPU
 ```
+
+**Option B: Google Colab Training (Recommended)**
+1. Upload `train_underwater_enhancer_colab.ipynb` to Google Colab
+2. Set runtime to GPU (Runtime → Change runtime type → GPU)
+3. Run all cells - dataset loads from Google Drive after first run
+4. Models save automatically to Google Drive
 
 #### 4. Run Inference
 ```bash
@@ -71,31 +79,37 @@ python inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
 
 ## 🏗️ Architecture
 
-### Model Options
-- **LightweightUNet**: Fast training, ~2M parameters (recommended for testing)
-- **UNetAutoencoder**: Full-featured, ~30M parameters (production quality)
-- **AttentionUNet**: Enhanced with attention mechanisms (~10M parameters)
-- **WaterNet**: Specialized for underwater characteristics (~15M parameters)
+### Standard U-Net Model
+- **Architecture**: Standard U-Net with skip connections
+- **Parameters**: ~31M parameters for optimal quality
+- **Feature progression**: 64 → 128 → 256 → 512 → 1024 channels
+- **Purpose**: Designed specifically for underwater image enhancement
 
 ### Key Features
 - **Skip connections** for detail preservation
 - **Multi-scale processing** for global and local enhancement
-- **Underwater-specific loss functions** including color correction
-- **Attention mechanisms** for better feature extraction
-- **Progressive training** from low to high resolution
+- **Combined L1+MSE loss** for sharp details and color consistency
+- **Optimized for underwater characteristics** (color correction, contrast enhancement)
 
 ## 📊 Training Details
 
-### Loss Function Components
-- **Pixel Loss (L1)**: Direct pixel-wise accuracy
-- **Perceptual Loss**: VGG feature matching for natural appearance
-- **Color Loss**: LAB color space consistency for underwater color correction
-- **SSIM Loss**: Structural similarity for detail preservation
+### Loss Function
+- **Combined L1+MSE Loss**: 
+  - 80% L1 Loss for sharp detail preservation
+  - 20% MSE Loss for color and brightness consistency
+- **Optimized for underwater enhancement**: Balances detail and color correction
 
-### Training Strategy
-1. **Phase 1**: Train on 512×512 downsampled images for fast iteration
-2. **Phase 2**: Fine-tune on patches from full resolution
-3. **Phase 3**: Full resolution training (4606×4030) if memory permits
+### Training Options
+
+**Option 1: Google Colab (Recommended)**
+- Use `train_underwater_enhancer_colab.ipynb` 
+- Free GPU access, dataset caching to Google Drive
+- Automatic model saving and resuming
+
+**Option 2: Local Training**
+- Use `train_unet.py` with your local GPU/CPU
+- Requires manual dataset setup
+- Good for development and testing
 
 ### Memory Optimization
 - Mixed precision training (FP16)
@@ -107,21 +121,17 @@ python inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
 
 ```
 auto-image-encoder/
-├── src/
-│   ├── models/
-│   │   ├── unet_autoencoder.py     # U-Net architectures
-│   │   └── attention_unet.py       # Attention-enhanced models
-│   ├── data/
-│   │   └── dataset.py              # Dataset loaders
-│   └── utils/
-│       └── losses.py               # Custom loss functions
-├── preprocess_images.py            # GPR → RAW conversion + cropping
-├── prepare_dataset.py              # Dataset organization
-├── train.py                        # Training script
-├── inference.py                    # Inference script
+├── dataset/                        # Training dataset (1000 image pairs)
+│   ├── input_GPR/                  # Raw GPR input images
+│   └── human_output_JPEG/          # Manually edited target images
+├── photos/                         # Full dataset (3414 image pairs)
+│   ├── input_GPR/                  # All GPR input images
+│   └── human_output_JPEG/          # All manually edited images
+├── train_unet.py                   # Local training script (Standard U-Net)
+├── train_underwater_enhancer_colab.ipynb  # Google Colab notebook
+├── create_subset.py                # Dataset subset creation script
 ├── config.yaml                     # Training configuration
-├── TRAINING_GUIDE.md              # Detailed training guide
-└── requirements.txt               # Python dependencies
+└── requirements.txt                # Python dependencies
 ```
 
 ## ⚙️ Configuration
@@ -129,29 +139,31 @@ auto-image-encoder/
 Edit `config.yaml` to customize training:
 
 ```yaml
-# Model selection
+# Model Configuration (Standard U-Net)
 model:
-  type: "LightweightUNet"  # LightweightUNet, UNetAutoencoder, AttentionUNet, WaterNet
-  base_features: 32
+  n_channels: 3  # Input channels (RGB)
+  n_classes: 3   # Output channels (RGB)
+  # Fixed architecture: 64 → 128 → 256 → 512 → 1024
 
 # Training parameters
 training:
-  epochs: 100
-  learning_rate: 0.001
-  batch_size: 4
+  epochs: 50
+  learning_rate: 0.0001
+  lr_scheduler: "reduce_on_plateau"
+  optimizer: "adam"
+  
+  # Loss configuration
+  loss:
+    l1_weight: 0.8    # L1 loss for sharp details
+    mse_weight: 0.2   # MSE loss for color consistency
   
 # Data settings
 data:
-  image_size: [512, 512]  # Training resolution
+  batch_size: 16
+  image_size: [256, 256]  # Balanced for quality and GPU memory
   train_split: 0.8
-
-# Loss weights (adjust for underwater characteristics)
-training:
-  loss:
-    lambda_pixel: 1.0      # Pixel accuracy
-    lambda_perceptual: 0.1 # Natural appearance
-    lambda_color: 0.5      # Color correction (important!)
-    lambda_ssim: 0.5       # Detail preservation
+  input_dir: "dataset/input_GPR"
+  target_dir: "dataset/human_output_JPEG"
 ```
 
 ## 🔧 Troubleshooting
@@ -160,27 +172,26 @@ training:
 ```yaml
 # Reduce memory usage
 data:
-  batch_size: 1
-  image_size: [256, 256]
+  batch_size: 8      # Reduce from 16
+  image_size: [128, 128]  # Reduce from 256
 
 hardware:
-  mixed_precision: true
-
-model:
-  type: "LightweightUNet"
-  base_features: 16
+  mixed_precision: false  # Keep false for stability
 ```
 
-### Poor Color Correction
+### Training Not Converging
 ```yaml
-# Emphasize color learning
+# Adjust learning rate and loss weights
 training:
+  learning_rate: 0.001    # Increase learning rate
   loss:
-    lambda_color: 1.0
-
-model:
-  type: "WaterNet"  # Specialized for underwater
+    l1_weight: 0.9        # Emphasize sharp details
+    mse_weight: 0.1       # Reduce color smoothing
 ```
+
+### For CPU Training
+- Use Google Colab with GPU instead (much faster)
+- If you must use CPU, reduce batch_size to 1 and image_size to [128, 128]
 
 ## 📈 Monitoring Training
 
