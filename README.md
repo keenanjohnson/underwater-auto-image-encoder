@@ -218,6 +218,3 @@ The trained model should reproduce manual Lightroom adjustments:
 
 This project is part of the Seattle Aquarium's ROV survey enhancement pipeline. For questions or contributions, refer to the main [CCR development repository](https://github.com/Seattle-Aquarium/CCR_development).
 
-## 📄 License
-
-[Add appropriate license information]
