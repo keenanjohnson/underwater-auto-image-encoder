@@ -21,6 +21,93 @@ sys.path.append(str(Path(__file__).parent))
 from src.models.unet_autoencoder import UNetAutoencoder, LightweightUNet
 from src.models.attention_unet import AttentionUNet, WaterNet
 
+# Colab-compatible model blocks (matching exact architecture from notebook)
+class ColabDoubleConv(torch.nn.Module):
+    """Double Convolution Block matching Colab notebook (with bias)"""
+    def __init__(self, in_channels, out_channels, mid_channels=None):
+        super().__init__()
+        if not mid_channels:
+            mid_channels = out_channels
+        self.double_conv = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
+            torch.nn.BatchNorm2d(mid_channels),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
+            torch.nn.BatchNorm2d(out_channels),
+            torch.nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.double_conv(x)
+
+
+class ColabDown(torch.nn.Module):
+    """Downscaling with maxpool then double conv - Colab version"""
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.maxpool_conv = torch.nn.Sequential(
+            torch.nn.MaxPool2d(2),
+            ColabDoubleConv(in_channels, out_channels)
+        )
+
+    def forward(self, x):
+        return self.maxpool_conv(x)
+
+
+class ColabUp(torch.nn.Module):
+    """Upscaling then double conv - Colab version"""
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.up = torch.nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+        self.conv = ColabDoubleConv(in_channels, out_channels)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
+
+
+class ColabUNetAutoencoder(torch.nn.Module):
+    """Colab-compatible U-Net matching the exact architecture from the notebook"""
+    def __init__(self, n_channels=3, n_classes=3):
+        super(ColabUNetAutoencoder, self).__init__()
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+
+        # Encoder - matching Colab notebook exactly
+        self.inc = ColabDoubleConv(n_channels, 64)
+        self.down1 = ColabDown(64, 128)
+        self.down2 = ColabDown(128, 256)
+        self.down3 = ColabDown(256, 512)
+        self.down4 = ColabDown(512, 1024)
+        
+        # Decoder - matching Colab notebook exactly
+        self.up1 = ColabUp(1024, 512)
+        self.up2 = ColabUp(512, 256)
+        self.up3 = ColabUp(256, 128)
+        self.up4 = ColabUp(128, 64)
+        self.outc = torch.nn.Conv2d(64, n_classes, kernel_size=1)
+
+    def forward(self, x):
+        # Encoder
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        
+        # Decoder
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
+        x = self.up3(x, x2)
+        x = self.up4(x, x1)
+        logits = self.outc(x)
+        
+        return torch.sigmoid(logits)
+
+# Import blocks from local model for non-Colab models
+from src.models.unet_autoencoder import DoubleConv, Down, Up
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -33,11 +120,12 @@ class Inferencer:
         
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
         
-        if config_path:
+        if config_path and os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 self.config = yaml.safe_load(f)
         else:
-            self.config = checkpoint.get('config', {})
+            # Handle Colab checkpoint format - create default config
+            self.config = self._create_default_config(checkpoint)
         
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu'
@@ -53,6 +141,44 @@ class Inferencer:
         
         self.setup_transforms()
     
+    def _create_default_config(self, checkpoint):
+        """Create default config for Colab-trained models"""
+        # Check if checkpoint has model_config (from final save in Colab)
+        if 'model_config' in checkpoint:
+            model_config = checkpoint['model_config']
+            return {
+                'model': {
+                    'type': 'UNetAutoencoder',  # Default to UNetAutoencoder as used in Colab
+                    'n_channels': model_config.get('n_channels', 3),
+                    'n_classes': model_config.get('n_classes', 3),
+                    'base_features': 64,  # Default U-Net base features
+                    'bilinear': False
+                },
+                'data': {
+                    'image_size': [model_config.get('image_size', 256), model_config.get('image_size', 256)]
+                },
+                'inference': {
+                    'resize_inference': True  # Default: resize to training size for faster inference
+                }
+            }
+        else:
+            # Fallback config for basic Colab checkpoints
+            return {
+                'model': {
+                    'type': 'UNetAutoencoder',
+                    'n_channels': 3,
+                    'n_classes': 3,
+                    'base_features': 64,
+                    'bilinear': False
+                },
+                'data': {
+                    'image_size': [256, 256]
+                },
+                'inference': {
+                    'resize_inference': True
+                }
+            }
+    
     def setup_model(self):
         """Initialize model architecture"""
         model_type = self.config['model']['type']
@@ -65,9 +191,14 @@ class Inferencer:
             model_params['base_features'] = self.config['model']['base_features']
             self.model = LightweightUNet(**model_params)
         elif model_type == 'UNetAutoencoder':
-            model_params['base_features'] = self.config['model']['base_features']
-            model_params['bilinear'] = self.config['model'].get('bilinear', False)
-            self.model = UNetAutoencoder(**model_params)
+            # Check if this is a Colab checkpoint (without base_features parameter)
+            if 'base_features' not in self.config['model'] or self.config['model']['base_features'] == 64:
+                # Use Colab-compatible model for exact architecture match
+                self.model = ColabUNetAutoencoder(**model_params)
+            else:
+                model_params['base_features'] = self.config['model']['base_features']
+                model_params['bilinear'] = self.config['model'].get('bilinear', False)
+                self.model = UNetAutoencoder(**model_params)
         elif model_type == 'AttentionUNet':
             model_params['base_features'] = self.config['model']['base_features']
             self.model = AttentionUNet(**model_params)
@@ -116,15 +247,78 @@ class Inferencer:
         
         return tensor, (pad_h, pad_w)
     
+    def process_image_tiled(self, image_path: Path, tile_size=1024, overlap=128):
+        """Process large image using tiling to avoid memory issues"""
+        img = Image.open(image_path).convert('RGB')
+        original_size = img.size
+        width, height = original_size
+        
+        logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles")
+        
+        # Create output image
+        output_img = Image.new('RGB', original_size)
+        
+        # Process tiles
+        for y in range(0, height, tile_size - overlap):
+            for x in range(0, width, tile_size - overlap):
+                # Define tile boundaries
+                x_end = min(x + tile_size, width)
+                y_end = min(y + tile_size, height)
+                
+                # Extract tile
+                tile = img.crop((x, y, x_end, y_end))
+                
+                # Process tile
+                input_tensor = self.transform(tile).unsqueeze(0).to(self.device)
+                padded_tensor, (pad_h, pad_w) = self.pad_to_multiple(input_tensor, multiple=32)
+                
+                with torch.no_grad():
+                    output_tensor = self.model(padded_tensor)
+                
+                # Remove padding
+                if pad_h > 0 or pad_w > 0:
+                    _, _, h, w = input_tensor.shape
+                    output_tensor = output_tensor[:, :, :h, :w]
+                
+                output_tensor = output_tensor.squeeze(0).cpu()
+                enhanced_tile = self.inverse_transform(output_tensor)
+                
+                # Handle overlap blending for smoother results
+                if overlap > 0 and (x > 0 or y > 0):
+                    # Simple paste for now - could add feathering
+                    paste_x = x + overlap // 2 if x > 0 else x
+                    paste_y = y + overlap // 2 if y > 0 else y
+                    paste_x_end = x_end - overlap // 2 if x_end < width else x_end
+                    paste_y_end = y_end - overlap // 2 if y_end < height else y_end
+                    
+                    crop_x = overlap // 2 if x > 0 else 0
+                    crop_y = overlap // 2 if y > 0 else 0
+                    crop_x_end = enhanced_tile.size[0] - (overlap // 2 if x_end < width else 0)
+                    crop_y_end = enhanced_tile.size[1] - (overlap // 2 if y_end < height else 0)
+                    
+                    enhanced_tile_cropped = enhanced_tile.crop((crop_x, crop_y, crop_x_end, crop_y_end))
+                    output_img.paste(enhanced_tile_cropped, (paste_x, paste_y))
+                else:
+                    output_img.paste(enhanced_tile, (x, y))
+                
+                logger.info(f"Processed tile ({x}, {y}) to ({x_end}, {y_end})")
+        
+        return output_img
+
     def process_image(self, image_path: Path, output_path: Path = None):
         """Process a single image"""
         img = Image.open(image_path).convert('RGB')
         original_size = img.size
+        width, height = original_size
         
         # Check if we should resize during inference
         resize_inference = self.config.get('inference', {}).get('resize_inference', False)
         
-        if resize_inference:
+        # Use tiling for large images to avoid memory issues
+        if not resize_inference and (width > 2048 or height > 2048):
+            logger.info(f"Large image detected ({width}x{height}), using tiled processing")
+            output_img = self.process_image_tiled(image_path)
+        elif resize_inference:
             # Use training resolution
             input_tensor = self.transform(img).unsqueeze(0).to(self.device)
             
@@ -200,16 +394,28 @@ def main():
     parser.add_argument('input', type=str, help='Input image or directory')
     parser.add_argument('--checkpoint', type=str, required=True,
                         help='Path to model checkpoint')
-    parser.add_argument('--config', type=str, default='config.yaml',
-                        help='Path to configuration file')
+    parser.add_argument('--config', type=str, default=None,
+                        help='Path to configuration file (optional for Colab checkpoints)')
     parser.add_argument('--output', type=str, default='output',
                         help='Output directory or file')
     parser.add_argument('--compare', action='store_true',
                         help='Create side-by-side comparison')
+    parser.add_argument('--full-size', action='store_true',
+                        help='Process at original resolution (4606x4030) instead of resizing')
     
     args = parser.parse_args()
     
+    # Override config for full-size processing if requested
+    config_override = None
+    if args.full_size:
+        config_override = {'inference': {'resize_inference': False}}
+    
     inferencer = Inferencer(args.checkpoint, args.config)
+    
+    # Apply full-size override if requested
+    if config_override:
+        inferencer.config.update(config_override)
+        inferencer.setup_transforms()  # Refresh transforms
     
     input_path = Path(args.input)
     output_path = Path(args.output)
