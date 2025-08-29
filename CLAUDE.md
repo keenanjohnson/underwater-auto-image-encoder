@@ -140,8 +140,41 @@ Key settings:
 - ✅ Initial training
 - ⏳ Performance evaluation
 - ⏳ Pipeline integration
+- 🆕 GUI Application development (in progress)
+
+## GUI Application Development
+
+**Design Document**: See `DESIGN_GUI.md` for complete GUI application design and implementation plan.
+
+### GUI Overview
+- **Framework**: NiceGUI with native desktop mode
+- **Packaging**: PyInstaller for standalone executable distribution
+- **Target Users**: Marine biologists at Seattle Aquarium
+- **Key Features**: Single/batch processing, native file dialogs, real-time preview
+
+### GUI Development Status
+- ✅ Design document completed
+- ✅ Technology selection (NiceGUI + PyInstaller)
+- ⏳ Phase 1: Core GUI implementation
+- ⏳ Phase 2: Enhanced features
+- ⏳ Phase 3: GPR support integration
+- ⏳ Phase 4: Polish & packaging
+
+### Running GUI Application (once implemented)
+```bash
+# Development mode
+python app.py
+
+# Build standalone executable
+pyinstaller pyinstaller.spec
+
+# Run packaged application
+./dist/UnderwaterEnhancer  # Linux/macOS
+./dist/UnderwaterEnhancer.exe  # Windows
+```
 
 ## Resources
 - Discussion: https://github.com/Seattle-Aquarium/CCR_development/issues/29
 - Sample data: https://github.com/Seattle-Aquarium/CCR_development/tree/rmt_edits/files/ML_image_processing
 - Google Colab notebook: `train_underwater_enhancer_colab.ipynb`
+- GUI Design Document: `DESIGN_GUI.md`
