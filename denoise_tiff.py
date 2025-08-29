@@ -56,10 +56,7 @@ class TiffDenoiser:
         else:
             image_uint8 = image
         
-        if len(image_uint8.shape) == 3:
-            denoised = cv2.bilateralFilter(image_uint8, d, sigma_color, sigma_space)
-        else:
-            denoised = cv2.bilateralFilter(image_uint8, d, sigma_color, sigma_space)
+        denoised = cv2.bilateralFilter(image_uint8, d, sigma_color, sigma_space)
         
         if self.preserve_range and image.dtype == np.float32:
             return img_as_float(denoised)
