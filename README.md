@@ -75,6 +75,29 @@ python inference.py /path/to/images --checkpoint checkpoints/best_model.pth --ou
 
 # Create side-by-side comparisons
 python inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
+
+# Process at full resolution (uses tiled processing for large images)
+python inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-size
+```
+
+**Note**: For large images (>2048px), the inference script automatically uses tiled processing to avoid memory issues. This processes the image in overlapping tiles and blends them seamlessly.
+
+#### 5. Post-Process with Denoising (Optional)
+```bash
+# Apply denoising to TIFF outputs from inference
+python denoise_tiff.py enhanced_images/ --output final_images/
+
+# Use specific denoising algorithm (options: bilateral, nlmeans, gaussian, median, tv_chambolle, wavelet, bm3d_approximation)
+python denoise_tiff.py enhanced_images/ --method bilateral --output final_images/
+
+# Process single TIFF file with Non-Local Means (default)
+python denoise_tiff.py input.tiff --output output.tiff --nlmeans-h 0.1
+
+# Use bilateral filter (recommended for underwater images)
+python denoise_tiff.py input.tiff --method bilateral --bilateral-sigma-color 75
+
+# Preserve original value range
+python denoise_tiff.py input.tiff --preserve-range
 ```
 
 ## 🏗️ Architecture
@@ -90,6 +113,8 @@ python inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
 - **Multi-scale processing** for global and local enhancement
 - **Combined L1+MSE loss** for sharp details and color consistency
 - **Optimized for underwater characteristics** (color correction, contrast enhancement)
+- **Tiled processing** for high-resolution images (>2048px) to avoid memory issues
+- **Post-processing denoising** with 7 different algorithms for final quality enhancement
 
 ## 📊 Training Details
 
@@ -129,6 +154,8 @@ auto-image-encoder/
 │   └── human_output_JPEG/          # All manually edited images
 ├── train_unet.py                   # Local training script (Standard U-Net)
 ├── train_underwater_enhancer_colab.ipynb  # Google Colab notebook
+├── inference.py                    # Inference script with tiled processing
+├── denoise_tiff.py                # Post-processing denoising script
 ├── create_subset.py                # Dataset subset creation script
 ├── config.yaml                     # Training configuration
 └── requirements.txt                # Python dependencies
