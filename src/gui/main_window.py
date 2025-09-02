@@ -13,6 +13,12 @@ from typing import Optional
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
+# Import version from main app module
+try:
+    from app import __version__
+except ImportError:
+    __version__ = "dev"
+
 from src.gui.image_processor import ImageProcessor
 
 # Configure logging
@@ -33,7 +39,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
         super().__init__()
         
         # Window configuration
-        self.title("🌊 Underwater Image Enhancer")
+        self.title(f"🌊 Underwater Image Enhancer v{__version__}")
         self.geometry("980x850")  # Larger initial size to show all controls
         self.minsize(950, 800)    # Ensure minimum height shows buttons
         

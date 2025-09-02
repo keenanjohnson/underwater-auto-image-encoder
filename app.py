@@ -4,6 +4,8 @@ Underwater Image Enhancer GUI Application
 Main entry point for the desktop application
 """
 
+__version__ = "0.1.0"
+
 import sys
 from pathlib import Path
 

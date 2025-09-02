@@ -90,8 +90,8 @@ if system == 'darwin':
         icon='assets/icon.icns' if Path('assets/icon.icns').exists() else None,
         bundle_identifier='com.seattleaquarium.underwaterenhancer',
         info_plist={
-            'CFBundleShortVersionString': '1.0.0',
-            'CFBundleVersion': '1.0.0',
+            'CFBundleShortVersionString': '0.1.0',
+            'CFBundleVersion': '0.1.0',
             'NSHighResolutionCapable': True,
             'LSMinimumSystemVersion': '10.13.0',
             'CFBundleExecutable': 'UnderwaterEnhancer',
