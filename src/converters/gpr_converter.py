@@ -33,14 +33,7 @@ class GPRConverter:
             binary_path = base_path / 'linux' / 'gpr_tools'
         
         if not binary_path.exists():
-            logger.warning(f"gpr_tools binary not found at {binary_path}")
-            # Try to find it in the system PATH as fallback
-            import shutil
-            system_gpr = shutil.which('gpr_tools')
-            if system_gpr:
-                logger.info(f"Using system gpr_tools at {system_gpr}")
-                return Path(system_gpr)
-            raise FileNotFoundError(f"gpr_tools binary not found at {binary_path}")
+            raise FileNotFoundError(f"gpr_tools binary not found at {binary_path}. GPR support requires the bundled gpr_tools binary.")
         
         # Ensure binary is executable on Unix systems
         if system != 'windows':

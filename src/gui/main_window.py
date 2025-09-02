@@ -349,6 +349,12 @@ class UnderwaterEnhancerApp(ctk.CTk):
             model_path = self.model_path_var.get()
             self.processor = ImageProcessor(model_path)
             
+            # Log GPR support status
+            if self.processor.gpr_support:
+                self.log("GPR support: Available ✓")
+            else:
+                self.log("GPR support: Not available (gpr_tools binary missing)")
+            
             self.log("Loading model...")
             self.processor.load_model()
             self.log("Model loaded successfully - Processing at full resolution")
@@ -363,9 +369,20 @@ class UnderwaterEnhancerApp(ctk.CTk):
             # Process batch
             self.log(f"Starting batch processing of {len(self.input_files)} images...")
             
-            # Warn about GPR processing time
+            # Check for GPR files and GPR support
             gpr_files = [f for f in self.input_files if f.suffix.lower() == '.gpr']
             if gpr_files:
+                # Check if GPR support is available
+                if not self.processor.gpr_support:
+                    error_msg = (
+                        f"Cannot process {len(gpr_files)} GPR file(s).\n\n"
+                        "GPR support is not available - the gpr_tools binary is missing.\n"
+                        "Please rebuild the application with GPR support enabled."
+                    )
+                    self.log(f"Error: {error_msg}")
+                    messagebox.showerror("GPR Support Missing", error_msg)
+                    return
+                
                 self.log(f"Note: Processing {len(gpr_files)} GPR files at 4606×4030 resolution")
                 self.log("This may take several minutes per image...")
             

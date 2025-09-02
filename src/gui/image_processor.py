@@ -31,6 +31,11 @@ class ImageProcessor:
         self.inferencer = None
         self.gpr_converter = GPRConverter()
         
+        # Check if GPR support is available
+        self.gpr_support = GPRConverter.is_available()
+        if not self.gpr_support:
+            logger.warning("GPR support is not available - gpr_tools binary not found")
+        
     def load_model(self):
         """Load the ML model - always at full resolution"""
         if not self.inferencer:
@@ -59,6 +64,11 @@ class ImageProcessor:
         
         # Check if input is GPR
         if self.gpr_converter.is_gpr_file(input_path):
+            if not self.gpr_support:
+                raise RuntimeError(
+                    "GPR file detected but GPR support is not available. "
+                    "The gpr_tools binary is missing from the bundled application."
+                )
             # Convert to TIFF first (let converter create temp file)
             tiff_path = self.gpr_converter.convert(input_path, output_path=None)
             
