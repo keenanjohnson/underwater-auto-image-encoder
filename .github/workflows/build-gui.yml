@@ -230,6 +230,17 @@ jobs:
     - name: Build with PyInstaller
       run: |
         pyinstaller pyinstaller.spec --clean --noconfirm
+    
+    - name: Fix macOS App Permissions
+      if: matrix.os == 'macos-latest'
+      run: |
+        # Make the app executable and remove extended attributes
+        chmod +x dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer
+        # Remove quarantine attributes that might be added
+        xattr -cr dist/UnderwaterEnhancer.app || true
+        # Ad-hoc sign the app (allows it to run on the same machine and others with reduced security)
+        codesign --force --deep --sign - dist/UnderwaterEnhancer.app
+        echo "App has been ad-hoc signed"
 
     - name: List dist contents
       run: |
@@ -266,14 +277,23 @@ jobs:
             sys.exit(1)
         "
 
-    - name: Create release archive (Linux/macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Create release archive (Linux)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         cd dist
-        if [ -d "${{ matrix.binary_name }}" ]; then
-          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}.tar.gz" "${{ matrix.binary_name }}"
+        tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}.tar.gz" *
+        cd ..
+    
+    - name: Create release archive (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd dist
+        # Create a DMG for better macOS distribution (optional, falls back to zip)
+        if command -v hdiutil &> /dev/null; then
+          hdiutil create -volname "UnderwaterEnhancer" -srcfolder "UnderwaterEnhancer.app" -ov -format UDZO "../UnderwaterEnhancer-${{ matrix.platform }}.dmg" || \
+          zip -r "../UnderwaterEnhancer-${{ matrix.platform }}.zip" "UnderwaterEnhancer.app"
         else
-          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}.tar.gz" *
+          zip -r "../UnderwaterEnhancer-${{ matrix.platform }}.zip" "UnderwaterEnhancer.app"
         fi
         cd ..
 

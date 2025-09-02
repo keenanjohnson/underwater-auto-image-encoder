@@ -54,9 +54,12 @@ pyinstaller pyinstaller.spec --clean --noconfirm
 ```
 
 ### Output Locations
-- **macOS**: `dist/UnderwaterEnhancer.app`
+- **macOS**: `dist/UnderwaterEnhancer.app` (see [macOS Installation Guide](MACOS_APP_INSTALLATION.md))
 - **Windows**: `dist/UnderwaterEnhancer.exe`
 - **Linux**: `dist/UnderwaterEnhancer`
+
+### macOS Security Note
+Downloaded macOS apps require security approval. See [MACOS_APP_INSTALLATION.md](MACOS_APP_INSTALLATION.md) for instructions.
 
 ## Features
 

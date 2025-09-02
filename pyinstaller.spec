@@ -94,5 +94,13 @@ if system == 'darwin':
             'CFBundleVersion': '1.0.0',
             'NSHighResolutionCapable': True,
             'LSMinimumSystemVersion': '10.13.0',
+            'CFBundleExecutable': 'UnderwaterEnhancer',
+            'CFBundleName': 'Underwater Enhancer',
+            'CFBundleDisplayName': 'Underwater Enhancer',
+            'CFBundleIdentifier': 'com.seattleaquarium.underwaterenhancer',
+            'NSRequiresAquaSystemAppearance': False,
+            'NSAppleEventsUsageDescription': 'This app needs to control other apps.',
+            'NSCameraUsageDescription': 'This app needs camera access to process images.',
+            'NSPhotoLibraryUsageDescription': 'This app needs photo library access to process images.',
         },
     )
