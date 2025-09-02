@@ -20,7 +20,7 @@ A desktop GUI application that enables marine biologists at Seattle Aquarium to 
 
 ### Functional Requirements
 1. **Input Support**: GPR images
-2. **Output Formats**: TIFF images
+2. **Output Formats**: TIFF or JPEG
 3. **Visual Feedback**: Progress bars
 5. **Error Handling**: Clear error messages, recovery options
 6. **Performance**: Process 4606x4030 image in <30 seconds on standard hardware
