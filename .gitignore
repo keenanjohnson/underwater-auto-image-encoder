@@ -3,6 +3,10 @@ training_data/
 test_data/
 output/
 
+# gpr_tools binaries
+gpr_tools
+gpr_tools.exe
+
 # OS Files
 .DS_Store
 

@@ -127,11 +127,23 @@ jobs:
         pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
         pip install -r requirements_gui.txt
 
+    - name: Check if GPR binary directory exists
+      id: check_gpr_dir
+      run: |
+        GPR_DIR=$(dirname "${{ matrix.gpr_binary }}")
+        if [ ! -d "$GPR_DIR" ]; then
+          mkdir -p "$GPR_DIR"
+          echo "Created GPR directory: $GPR_DIR"
+        fi
+        echo "gpr_dir=$GPR_DIR" >> $GITHUB_OUTPUT
+      shell: bash
+
     - name: Cache GPR tools binary
       uses: actions/cache@v4
       with:
-        path: ${{ matrix.gpr_binary }}
+        path: ${{ steps.check_gpr_dir.outputs.gpr_dir }}
         key: ${{ runner.os }}-gpr-tools-${{ hashFiles('build_scripts/compile_gpr_tools.*') }}
+        enableCrossOsArchive: false
 
     - name: Compile GPR tools (Linux/macOS)
       if: matrix.os != 'windows-latest'
