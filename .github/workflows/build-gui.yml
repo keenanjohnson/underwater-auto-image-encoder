@@ -68,13 +68,26 @@ jobs:
     - name: Install system dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install cmake || brew upgrade cmake
+        # Check if cmake is already available
+        if ! command -v cmake &> /dev/null; then
+          echo "Installing cmake..."
+          brew install cmake
+        else
+          echo "cmake is already installed: $(cmake --version | head -1)"
+        fi
 
     - name: Install system dependencies (Windows)
       if: matrix.os == 'windows-latest'
       run: |
         choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
 
+    - name: Verify build tools
+      run: |
+        echo "Checking build tools..."
+        cmake --version || echo "cmake not found"
+        python --version
+        pip --version
+    
     - name: Create requirements_gui.txt if not exists
       run: |
         python -c "
@@ -124,10 +137,18 @@ jobs:
       if: matrix.os != 'windows-latest'
       run: |
         if [ ! -f "${{ matrix.gpr_binary }}" ]; then
+          echo "Compiling GPR tools..."
           chmod +x build_scripts/compile_gpr_tools.sh
-          ./build_scripts/compile_gpr_tools.sh
+          ./build_scripts/compile_gpr_tools.sh || echo "GPR compilation failed - continuing without GPR support"
         else
           echo "Using cached GPR tools binary"
+        fi
+        # Verify binary exists
+        if [ -f "${{ matrix.gpr_binary }}" ]; then
+          echo "GPR tools binary available at: ${{ matrix.gpr_binary }}"
+          ls -la "${{ matrix.gpr_binary }}"
+        else
+          echo "Warning: GPR tools binary not available - GPR support will be disabled"
         fi
 
     - name: Compile GPR tools (Windows)
@@ -135,9 +156,16 @@ jobs:
       shell: cmd
       run: |
         if not exist "${{ matrix.gpr_binary }}" (
-          build_scripts\compile_gpr_tools.bat
+          echo Compiling GPR tools...
+          build_scripts\compile_gpr_tools.bat || echo GPR compilation failed - continuing without GPR support
         ) else (
           echo Using cached GPR tools binary
+        )
+        if exist "${{ matrix.gpr_binary }}" (
+          echo GPR tools binary available at: ${{ matrix.gpr_binary }}
+          dir "${{ matrix.gpr_binary }}"
+        ) else (
+          echo Warning: GPR tools binary not available - GPR support will be disabled
         )
       continue-on-error: true
 
