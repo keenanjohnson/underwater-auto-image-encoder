@@ -59,33 +59,64 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='UnderwaterEnhancer',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,  # Set to True for debugging
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon='assets/icon.ico' if system == 'windows' and Path('assets/icon.ico').exists() else None,
-)
+if system == 'darwin':
+    # macOS: Use onedir mode for .app bundle
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='UnderwaterEnhancer',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,  # No console for macOS app
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name='UnderwaterEnhancer',
+    )
+else:
+    # Windows/Linux: Use onefile mode
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        [],
+        name='UnderwaterEnhancer',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        runtime_tmpdir=None,
+        console=False,  # Set to True for debugging
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon='assets/icon.ico' if system == 'windows' and Path('assets/icon.ico').exists() else None,
+    )
 
 # macOS specific
 if system == 'darwin':
     app = BUNDLE(
-        exe,
+        coll,
         name='UnderwaterEnhancer.app',
         icon='assets/icon.icns' if Path('assets/icon.icns').exists() else None,
         bundle_identifier='com.seattleaquarium.underwaterenhancer',
