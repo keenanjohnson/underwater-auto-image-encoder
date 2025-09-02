@@ -104,11 +104,11 @@ def build_executable():
     print("\nBuilding executable with PyInstaller...")
     
     # Clean previous builds
-    for dir_name in ['build', 'dist']:
-        dir_path = Path(dir_name)
-        if dir_path.exists():
-            print(f"Cleaning {dir_name}...")
-            shutil.rmtree(dir_path)
+            try:
+                shutil.rmtree(dir_path)
+            except Exception as e:
+                print(f"Error cleaning {dir_name}: {e}")
+                return False
     
     # Check if spec file exists
     spec_file = Path('pyinstaller.spec')
