@@ -47,7 +47,13 @@ The application is automatically built for all platforms when:
 - Creating a release tag (v*)
 - Manually triggering the workflow
 
-Build artifacts are available in GitHub Actions for 7 days.
+### CI/CD Features
+- ✅ Cross-platform builds (Windows, macOS, Linux)
+- ✅ Automatic GPR tools compilation
+- ✅ CPU-only PyTorch for smaller artifacts
+- ✅ Build artifacts available for 7 days
+- ✅ Automatic release creation on version tags
+- ✅ Cached dependencies for faster builds
 
 ## Build Requirements
 
@@ -66,6 +72,8 @@ GPR file support requires the gpr_tools binary. The build script will:
 1. Check for existing binary in `binaries/<platform>/`
 2. Attempt to compile from source if missing
 3. Continue without GPR support if compilation fails
+
+**Important**: GPR support requires the bundled binary - there is no fallback to system PATH. This ensures consistent behavior across all installations.
 
 ## Troubleshooting
 

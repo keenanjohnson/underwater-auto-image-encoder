@@ -34,10 +34,11 @@ python build_scripts/build_app.py
 ```
 
 This will:
-1. Install all dependencies
-2. Create application icons
-3. Build the executable using PyInstaller
-4. Output to `dist/` directory
+1. Check for/compile gpr_tools (optional - for GPR file support)
+2. Install all dependencies
+3. Create application icons
+4. Build the executable using PyInstaller
+5. Output to `dist/` directory (~166MB with PyTorch)
 
 ### Manual Build with GPR Support
 
@@ -59,8 +60,8 @@ pyinstaller pyinstaller.spec --clean --noconfirm
 
 ## Features
 
-- ✅ Native GPR file support (converts to 4606×4030 TIFF)
-- ✅ Full resolution processing (no image downscaling)
+- ✅ Native GPR file support (requires bundled gpr_tools binary)
+- ✅ Full resolution processing (4606×4030, no downscaling)
 - ✅ Batch processing with progress tracking
 - ✅ Dark/Light mode toggle
 - ✅ TIFF and JPEG output formats
@@ -68,13 +69,16 @@ pyinstaller pyinstaller.spec --clean --noconfirm
 - ✅ Time estimates for batch processing
 - ✅ Cancel processing at any time
 - ✅ Cross-platform (Windows, macOS, Linux)
+- ✅ Automated CI/CD builds via GitHub Actions
 
 ## Troubleshooting
 
 ### Missing gpr_tools Binary
-If you see warnings about missing gpr_tools:
-1. The app will still work with TIFF/JPEG files
-2. To add GPR support, compile gpr_tools using the provided script
+If GPR files cannot be processed:
+1. The app will show "GPR support not available" in logs
+2. The app will still work with TIFF/JPEG files
+3. To add GPR support, compile gpr_tools using the provided script
+4. Note: GPR support requires the bundled binary - no system PATH fallback
 
 ### PyTorch Installation
 For CPU-only PyTorch (smaller download):
