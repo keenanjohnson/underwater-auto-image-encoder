@@ -36,8 +36,8 @@ class ImageProcessor:
         if not self.inferencer:
             self.inferencer = Inferencer(self.model_path, self.config_path)
             
-            # Always force full-size processing (no resizing)
-            self.inferencer.config['inference'] = {'resize_inference': False}
+            # Always force full-size processing (no resizing) - safely set the config
+            self.inferencer.config.setdefault('inference', {})['resize_inference'] = False
             self.inferencer.setup_transforms()  # Refresh transforms with new config
             logger.info(f"Model loaded from {self.model_path} - Full resolution (4606×4030)")
     
