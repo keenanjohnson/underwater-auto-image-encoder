@@ -104,6 +104,10 @@ def build_executable():
     print("\nBuilding executable with PyInstaller...")
     
     # Clean previous builds
+    for dir_name in ['build', 'dist']:
+        dir_path = Path(dir_name)
+        if dir_path.exists():
+            print(f"Cleaning {dir_name}/...")
             try:
                 shutil.rmtree(dir_path)
             except Exception as e:

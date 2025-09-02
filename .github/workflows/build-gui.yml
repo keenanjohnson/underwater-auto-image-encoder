@@ -1,0 +1,233 @@
+name: Build GUI Application
+
+on:
+  push:
+    branches: [ main, basic-gui ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            binary_name: UnderwaterEnhancer
+            gpr_binary: binaries/linux/gpr_tools
+          - os: windows-latest
+            platform: windows
+            binary_name: UnderwaterEnhancer.exe
+            gpr_binary: binaries/win32/gpr_tools.exe
+          - os: macos-latest
+            platform: macos
+            binary_name: UnderwaterEnhancer.app
+            gpr_binary: binaries/darwin/gpr_tools
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements_gui.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libgl1-mesa-glx \
+          libglib2.0-0 \
+          libsm6 \
+          libxext6 \
+          libxrender1 \
+          libgomp1 \
+          libgtk-3-0
+
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake
+
+    - name: Install system dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+
+    - name: Create requirements_gui.txt if not exists
+      run: |
+        python -c "
+        import os
+        if not os.path.exists('requirements_gui.txt'):
+            requirements = '''# GUI Framework
+        customtkinter>=5.2.0
+        darkdetect>=0.8.0
+        
+        # Image Processing
+        Pillow>=10.0.0
+        opencv-python>=4.8.0
+        scikit-image>=0.21.0
+        rawpy>=0.18.0
+        imageio>=2.31.0
+        
+        # ML Dependencies
+        torch>=2.0.0
+        torchvision>=0.15.0
+        numpy>=1.24.0
+        
+        # Utilities
+        PyYAML>=6.0
+        tqdm>=4.65.0
+        
+        # Packaging
+        pyinstaller>=6.0.0
+        '''
+            with open('requirements_gui.txt', 'w') as f:
+                f.write(requirements)
+        "
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_gui.txt
+
+    - name: Cache GPR tools binary
+      uses: actions/cache@v3
+      with:
+        path: ${{ matrix.gpr_binary }}
+        key: ${{ runner.os }}-gpr-tools-${{ hashFiles('build_scripts/compile_gpr_tools.*') }}
+
+    - name: Compile GPR tools (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        if [ ! -f "${{ matrix.gpr_binary }}" ]; then
+          chmod +x build_scripts/compile_gpr_tools.sh
+          ./build_scripts/compile_gpr_tools.sh
+        else
+          echo "Using cached GPR tools binary"
+        fi
+
+    - name: Compile GPR tools (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: cmd
+      run: |
+        if not exist "${{ matrix.gpr_binary }}" (
+          build_scripts\compile_gpr_tools.bat
+        ) else (
+          echo Using cached GPR tools binary
+        )
+      continue-on-error: true
+
+    - name: Create placeholder icons
+      run: |
+        python -c "
+        from pathlib import Path
+        import os
+        
+        # Create assets directory
+        Path('assets').mkdir(exist_ok=True)
+        
+        # Create placeholder icon.png
+        try:
+            from PIL import Image, ImageDraw
+            size = 256
+            img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.ellipse([10, 10, size-10, size-10], fill=(30, 144, 255))
+            img.save('assets/icon.png')
+            print('Created icon.png')
+            
+            # Create ICO for Windows
+            if '${{ matrix.os }}' == 'windows-latest':
+                img.save('assets/icon.ico', format='ICO', sizes=[(256, 256)])
+                print('Created icon.ico')
+        except ImportError:
+            print('PIL not available, skipping icon creation')
+        "
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller pyinstaller.spec --clean --noconfirm
+
+    - name: List dist contents
+      run: |
+        python -c "
+        import os
+        for root, dirs, files in os.walk('dist'):
+            level = root.replace('dist', '').count(os.sep)
+            indent = ' ' * 2 * level
+            print(f'{indent}{os.path.basename(root)}/')
+            subindent = ' ' * 2 * (level + 1)
+            for file in files[:10]:  # Limit to first 10 files
+                print(f'{subindent}{file}')
+        "
+
+    - name: Test executable exists
+      run: |
+        python -c "
+        import os
+        import sys
+        
+        expected_path = 'dist/${{ matrix.binary_name }}'
+        if os.path.exists(expected_path):
+            print(f'✓ Found {expected_path}')
+            file_size = os.path.getsize(expected_path) if os.path.isfile(expected_path) else 0
+            if file_size > 0:
+                print(f'  Size: {file_size / 1024 / 1024:.2f} MB')
+        else:
+            print(f'✗ Not found: {expected_path}')
+            sys.exit(1)
+        "
+
+    - name: Create release archive (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd dist
+        if [ -d "${{ matrix.binary_name }}" ]; then
+          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}.tar.gz" "${{ matrix.binary_name }}"
+        else
+          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}.tar.gz" *
+        fi
+        cd ..
+
+    - name: Create release archive (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        Compress-Archive -Path "dist\*" -DestinationPath "UnderwaterEnhancer-${{ matrix.platform }}.zip"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: UnderwaterEnhancer-${{ matrix.platform }}
+        path: |
+          UnderwaterEnhancer-${{ matrix.platform }}.*
+        retention-days: 7
+
+    - name: Upload to Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          UnderwaterEnhancer-${{ matrix.platform }}.*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

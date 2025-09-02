@@ -33,6 +33,13 @@ class GPRConverter:
             binary_path = base_path / 'linux' / 'gpr_tools'
         
         if not binary_path.exists():
+            logger.warning(f"gpr_tools binary not found at {binary_path}")
+            # Try to find it in the system PATH as fallback
+            import shutil
+            system_gpr = shutil.which('gpr_tools')
+            if system_gpr:
+                logger.info(f"Using system gpr_tools at {system_gpr}")
+                return Path(system_gpr)
             raise FileNotFoundError(f"gpr_tools binary not found at {binary_path}")
         
         # Ensure binary is executable on Unix systems
@@ -56,7 +63,11 @@ class GPRConverter:
         Returns:
             Path to converted TIFF file
         """
-        gpr_tools = cls.get_gpr_tools_path()
+        try:
+            gpr_tools = cls.get_gpr_tools_path()
+        except FileNotFoundError as e:
+            logger.error(str(e))
+            raise
         
         # Create temp DNG file since gpr_tools outputs DNG
         with tempfile.NamedTemporaryFile(suffix='.dng', delete=False) as tmp:
@@ -144,6 +155,15 @@ class GPRConverter:
     def is_gpr_file(cls, file_path: Path) -> bool:
         """Check if file is a GPR file"""
         return file_path.suffix.lower() in ['.gpr']
+    
+    @classmethod
+    def is_available(cls) -> bool:
+        """Check if GPR conversion is available"""
+        try:
+            cls.get_gpr_tools_path()
+            return True
+        except FileNotFoundError:
+            return False
     
     @classmethod
     def batch_convert(cls, gpr_files: list[Path], output_dir: Path = None,
