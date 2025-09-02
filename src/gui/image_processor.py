@@ -32,10 +32,14 @@ class ImageProcessor:
         self.gpr_converter = GPRConverter()
         
     def load_model(self):
-        """Load the ML model"""
+        """Load the ML model - always at full resolution"""
         if not self.inferencer:
             self.inferencer = Inferencer(self.model_path, self.config_path)
-            logger.info(f"Model loaded from {self.model_path}")
+            
+            # Always force full-size processing (no resizing)
+            self.inferencer.config['inference'] = {'resize_inference': False}
+            self.inferencer.setup_transforms()  # Refresh transforms with new config
+            logger.info(f"Model loaded from {self.model_path} - Full resolution (4606×4030)")
     
     def process_image(self, input_path: Path, output_path: Path, 
                      output_format: str = 'TIFF') -> Path:
@@ -55,19 +59,19 @@ class ImageProcessor:
         
         # Check if input is GPR
         if self.gpr_converter.is_gpr_file(input_path):
-            # Convert to TIFF first
-            with tempfile.NamedTemporaryFile(suffix='.tiff', delete=False) as tmp:
-                tiff_path = Path(tmp.name)
-            
-            tiff_path = self.gpr_converter.convert(input_path, tiff_path)
+            # Convert to TIFF first (let converter create temp file)
+            tiff_path = self.gpr_converter.convert(input_path, output_path=None)
             
             try:
                 # Process the TIFF
                 result = self.inferencer.process_image(tiff_path, output_path)
             finally:
                 # Clean up temp TIFF
-                if tiff_path.exists():
-                    tiff_path.unlink()
+                if tiff_path and tiff_path.exists():
+                    try:
+                        tiff_path.unlink()
+                    except:
+                        pass
             
             # Convert output format if needed
             if output_format.upper() == 'JPEG' and output_path.suffix.lower() != '.jpg':

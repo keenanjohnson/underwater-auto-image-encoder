@@ -6,6 +6,8 @@ darkdetect==0.8.0
 Pillow>=10.0.0
 opencv-python>=4.8.0
 scikit-image>=0.21.0
+rawpy>=0.18.0  # For DNG to TIFF conversion
+imageio>=2.30.0  # For saving TIFF files
 
 # ML Dependencies
 torch>=2.0.0

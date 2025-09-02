@@ -347,7 +347,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
             
             self.log("Loading model...")
             self.processor.load_model()
-            self.log("Model loaded successfully")
+            self.log("Model loaded successfully - Processing at full resolution")
             
             # Setup paths
             output_dir = Path(self.output_path_var.get())
@@ -358,6 +358,12 @@ class UnderwaterEnhancerApp(ctk.CTk):
             
             # Process batch
             self.log(f"Starting batch processing of {len(self.input_files)} images...")
+            
+            # Warn about GPR processing time
+            gpr_files = [f for f in self.input_files if f.suffix.lower() == '.gpr']
+            if gpr_files:
+                self.log(f"Note: Processing {len(gpr_files)} GPR files at 4606×4030 resolution")
+                self.log("This may take several minutes per image...")
             
             results = self.processor.process_batch(
                 self.input_files,

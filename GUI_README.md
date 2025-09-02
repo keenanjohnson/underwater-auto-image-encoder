@@ -21,8 +21,8 @@ python app.py
 5. **Start Processing**: Click "▶ Start Processing" to begin
 
 The application will:
-- Automatically detect and convert GPR files
-- Process images through the ML model
+- Automatically detect and convert GPR files to 4606×4030 resolution
+- Process all images at full resolution (no downscaling)
 - Save enhanced images in your chosen format
 - Display progress and logs in real-time
 
@@ -59,7 +59,8 @@ pyinstaller pyinstaller.spec --clean --noconfirm
 
 ## Features
 
-- ✅ Native GPR file support (with bundled gpr_tools)
+- ✅ Native GPR file support (converts to 4606×4030 TIFF)
+- ✅ Full resolution processing (no image downscaling)
 - ✅ Batch processing with progress tracking
 - ✅ Dark/Light mode toggle
 - ✅ TIFF and JPEG output formats

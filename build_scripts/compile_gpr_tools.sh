@@ -30,7 +30,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     
     # Copy binary
     mkdir -p ../../../binaries/darwin
-    cp gpr_tools ../../../binaries/darwin/
+    cp source/app/gpr_tools/gpr_tools ../../../binaries/darwin/
+    chmod +x ../../../binaries/darwin/gpr_tools
     echo "✓ Binary copied to binaries/darwin/gpr_tools"
     
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -43,7 +44,8 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     
     # Copy binary
     mkdir -p ../../../binaries/linux
-    cp gpr_tools ../../../binaries/linux/
+    cp source/app/gpr_tools/gpr_tools ../../../binaries/linux/
+    chmod +x ../../../binaries/linux/gpr_tools
     echo "✓ Binary copied to binaries/linux/gpr_tools"
 else
     echo "Unsupported platform: $OSTYPE"

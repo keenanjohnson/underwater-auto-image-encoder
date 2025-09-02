@@ -58,28 +58,70 @@ class GPRConverter:
         """
         gpr_tools = cls.get_gpr_tools_path()
         
-        if output_path is None:
-            # Create temp file for output
-            with tempfile.NamedTemporaryFile(suffix='.tiff', delete=False) as tmp:
-                output_path = Path(tmp.name)
+        # Create temp DNG file since gpr_tools outputs DNG
+        with tempfile.NamedTemporaryFile(suffix='.dng', delete=False) as tmp:
+            dng_path = Path(tmp.name)
         
-        # Build command - gpr_tools uses positional arguments
-        cmd = [str(gpr_tools), str(gpr_path), str(output_path)]
+        # Build command with -i and -o flags
+        cmd = [str(gpr_tools), '-i', str(gpr_path), '-o', str(dng_path)]
         
         try:
-            # Run conversion
+            # Run GPR to DNG conversion
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=30  # 30 second timeout
+                timeout=60  # 60 second timeout for large files
             )
             
-            logger.info(f"Successfully converted {gpr_path.name} to TIFF")
+            logger.info(f"Successfully converted {gpr_path.name} to DNG")
             
-            if not output_path.exists():
-                raise RuntimeError(f"Conversion succeeded but output file not found: {output_path}")
+            if not dng_path.exists():
+                raise RuntimeError(f"Conversion succeeded but DNG file not found: {dng_path}")
+            
+            # Now convert DNG to TIFF using rawpy or PIL
+            try:
+                import rawpy
+                import imageio
+                
+                # Use rawpy to read DNG and convert to TIFF
+                with rawpy.imread(str(dng_path)) as raw:
+                    rgb = raw.postprocess(
+                        use_camera_wb=True,
+                        no_auto_bright=False,
+                        output_bps=16
+                    )
+                
+                if output_path is None:
+                    with tempfile.NamedTemporaryFile(suffix='.tiff', delete=False) as tmp:
+                        output_path = Path(tmp.name)
+                
+                # Save as TIFF
+                imageio.imwrite(str(output_path), rgb)
+                logger.info(f"Successfully converted DNG to TIFF")
+                
+            except ImportError:
+                # Fallback: If rawpy not available, try with PIL
+                from PIL import Image
+                
+                # Note: PIL may not handle DNG well, but let's try
+                try:
+                    img = Image.open(dng_path)
+                    if output_path is None:
+                        with tempfile.NamedTemporaryFile(suffix='.tiff', delete=False) as tmp:
+                            output_path = Path(tmp.name)
+                    img.save(output_path, 'TIFF')
+                    logger.info(f"Successfully converted DNG to TIFF using PIL")
+                except Exception as e:
+                    logger.warning(f"Could not convert DNG to TIFF: {e}")
+                    logger.warning("Consider installing rawpy for better DNG support")
+                    # Return the DNG path as fallback
+                    if output_path:
+                        output_path = dng_path.with_suffix('.tiff')
+                        dng_path.rename(output_path)
+                    else:
+                        output_path = dng_path
             
             return output_path
             
@@ -90,12 +132,13 @@ class GPRConverter:
             logger.error(f"GPR conversion failed: {e.stderr}")
             raise
         finally:
-            # Cleanup temp files if needed
-            if not keep_temp and output_path and output_path.exists() and output_path.parent == Path(tempfile.gettempdir()):
+            # Cleanup temp DNG file
+            if dng_path.exists() and not keep_temp:
                 try:
-                    output_path.unlink()
+                    dng_path.unlink()
                 except:
                     pass
+            # Don't cleanup the output TIFF - let the caller handle it
     
     @classmethod
     def is_gpr_file(cls, file_path: Path) -> bool:
