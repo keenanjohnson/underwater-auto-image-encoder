@@ -1,0 +1,169 @@
+"""
+Image processor that handles GPR, TIFF, and JPEG inputs
+"""
+from pathlib import Path
+import tempfile
+import logging
+from typing import Optional, Callable
+import sys
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+from src.converters.gpr_converter import GPRConverter
+from inference import Inferencer
+
+logger = logging.getLogger(__name__)
+
+class ImageProcessor:
+    """Handles image processing with GPR support"""
+    
+    def __init__(self, model_path: str, config_path: str = None):
+        """
+        Initialize the image processor
+        
+        Args:
+            model_path: Path to the ML model checkpoint
+            config_path: Optional path to config file
+        """
+        self.model_path = model_path
+        self.config_path = config_path
+        self.inferencer = None
+        self.gpr_converter = GPRConverter()
+        
+    def load_model(self):
+        """Load the ML model - always at full resolution"""
+        if not self.inferencer:
+            self.inferencer = Inferencer(self.model_path, self.config_path)
+            
+            # Always force full-size processing (no resizing) - safely set the config
+            self.inferencer.config.setdefault('inference', {})['resize_inference'] = False
+            self.inferencer.setup_transforms()  # Refresh transforms with new config
+            logger.info(f"Model loaded from {self.model_path} - Full resolution (4606×4030)")
+    
+    def process_image(self, input_path: Path, output_path: Path, 
+                     output_format: str = 'TIFF') -> Path:
+        """
+        Process a single image, handling GPR conversion if needed
+        
+        Args:
+            input_path: Path to input image
+            output_path: Path for output image
+            output_format: Output format ('TIFF' or 'JPEG')
+        
+        Returns:
+            Path to processed image
+        """
+        # Ensure model is loaded
+        self.load_model()
+        
+        # Check if input is GPR
+        if self.gpr_converter.is_gpr_file(input_path):
+            # Convert to TIFF first (let converter create temp file)
+            tiff_path = self.gpr_converter.convert(input_path, output_path=None)
+            
+            try:
+                # Process the TIFF
+                result = self.inferencer.process_image(tiff_path, output_path)
+            finally:
+                # Clean up temp TIFF
+                if tiff_path and tiff_path.exists():
+                    try:
+                        tiff_path.unlink()
+                    except:
+                        pass
+            
+            # Convert output format if needed
+            if output_format.upper() == 'JPEG' and output_path.suffix.lower() != '.jpg':
+                from PIL import Image
+                img = Image.open(output_path)
+                jpeg_path = output_path.with_suffix('.jpg')
+                img.save(jpeg_path, 'JPEG', quality=95)
+                if output_path != jpeg_path:
+                    output_path.unlink()
+                return jpeg_path
+            
+            return output_path
+        else:
+            # Direct processing for TIFF/JPEG
+            result = self.inferencer.process_image(input_path, output_path)
+            
+            # Convert output format if needed
+            if output_format.upper() == 'JPEG' and not output_path.suffix.lower() in ['.jpg', '.jpeg']:
+                from PIL import Image
+                img = Image.open(output_path)
+                jpeg_path = output_path.with_suffix('.jpg')
+                img.save(jpeg_path, 'JPEG', quality=95)
+                if output_path != jpeg_path:
+                    output_path.unlink()
+                return jpeg_path
+            
+            return output_path
+    
+    def process_batch(self, input_files: list[Path], output_dir: Path, 
+                     output_format: str = 'TIFF',
+                     progress_callback: Optional[Callable] = None,
+                     cancel_check: Optional[Callable] = None) -> list[tuple[Path, Path, bool, str]]:
+        """
+        Process multiple images in batch
+        
+        Args:
+            input_files: List of input image paths
+            output_dir: Directory for output images
+            output_format: Output format ('TIFF' or 'JPEG')
+            progress_callback: Optional callback(current, total, filename, status)
+            cancel_check: Optional callback that returns True to cancel
+        
+        Returns:
+            List of tuples (input_path, output_path, success, error_message)
+        """
+        # Ensure model is loaded
+        self.load_model()
+        
+        # Create output directory
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        results = []
+        
+        for i, input_path in enumerate(input_files):
+            # Check for cancellation
+            if cancel_check and cancel_check():
+                logger.info("Batch processing cancelled by user")
+                break
+            
+            # Update progress
+            if progress_callback:
+                progress_callback(i, len(input_files), input_path.name, "Processing")
+            
+            # Determine output filename
+            ext = '.tiff' if output_format.upper() == 'TIFF' else '.jpg'
+            output_path = output_dir / f"{input_path.stem}_enhanced{ext}"
+            
+            try:
+                # Process the image
+                actual_output = self.process_image(input_path, output_path, output_format)
+                results.append((input_path, actual_output, True, "Success"))
+                
+                if progress_callback:
+                    progress_callback(i + 1, len(input_files), input_path.name, "Complete")
+                    
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"Failed to process {input_path.name}: {error_msg}")
+                results.append((input_path, None, False, error_msg))
+                
+                if progress_callback:
+                    progress_callback(i + 1, len(input_files), input_path.name, f"Failed: {error_msg}")
+        
+        return results
+    
+    @staticmethod
+    def get_supported_formats() -> list[str]:
+        """Get list of supported input formats"""
+        return ['.gpr', '.tiff', '.tif', '.jpg', '.jpeg', '.png']
+    
+    @staticmethod
+    def filter_supported_files(files: list[Path]) -> list[Path]:
+        """Filter list of files to only supported formats"""
+        supported = ImageProcessor.get_supported_formats()
+        return [f for f in files if f.suffix.lower() in supported]

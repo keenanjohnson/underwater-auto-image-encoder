@@ -1,0 +1,22 @@
+# GUI Framework
+customtkinter==5.2.0
+darkdetect==0.8.0
+
+# Image Processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+scikit-image>=0.21.0
+rawpy>=0.18.0  # For DNG to TIFF conversion
+imageio>=2.30.0  # For saving TIFF files
+
+# ML Dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+
+# Utilities
+PyYAML>=6.0
+tqdm>=4.65.0
+
+# Packaging
+pyinstaller>=6.0.0
