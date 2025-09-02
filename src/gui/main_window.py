@@ -1,0 +1,474 @@
+"""
+Main GUI window for Underwater Image Enhancer using CustomTkinter
+"""
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+import threading
+from pathlib import Path
+import logging
+from datetime import datetime, timedelta
+import sys
+from typing import Optional
+
+# Add parent directory to path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+from src.gui.image_processor import ImageProcessor
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Set CustomTkinter appearance
+ctk.set_appearance_mode("system")  # Modes: "system", "dark", "light"
+ctk.set_default_color_theme("blue")  # Themes: "blue", "green", "dark-blue"
+
+class UnderwaterEnhancerApp(ctk.CTk):
+    """Main application window"""
+    
+    def __init__(self):
+        super().__init__()
+        
+        # Window configuration
+        self.title("🌊 Underwater Image Enhancer")
+        self.geometry("900x700")
+        self.minsize(800, 600)
+        
+        # Processing state
+        self.processing = False
+        self.cancel_processing = False
+        self.processor: Optional[ImageProcessor] = None
+        self.input_files = []
+        
+        # Create GUI elements
+        self.create_widgets()
+        
+        # Center window on screen
+        self.center_window()
+        
+    def center_window(self):
+        """Center the window on screen"""
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def create_widgets(self):
+        """Create all GUI widgets"""
+        
+        # Main container with padding
+        main_container = ctk.CTkFrame(self)
+        main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            main_container, 
+            text="Underwater Image Enhancer",
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        title_label.pack(pady=(0, 20))
+        
+        # Model Selection Frame
+        model_frame = ctk.CTkFrame(main_container)
+        model_frame.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(model_frame, text="Model Selection", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(10, 5))
+        
+        model_path_frame = ctk.CTkFrame(model_frame)
+        model_path_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        self.model_path_var = ctk.StringVar(value="")
+        self.model_entry = ctk.CTkEntry(
+            model_path_frame, 
+            textvariable=self.model_path_var,
+            placeholder_text="Select model file (.pth)",
+            width=500
+        )
+        self.model_entry.pack(side="left", padx=(10, 10), pady=10)
+        
+        self.model_browse_btn = ctk.CTkButton(
+            model_path_frame, 
+            text="Browse...",
+            command=self.browse_model,
+            width=100
+        )
+        self.model_browse_btn.pack(side="left", padx=(0, 10), pady=10)
+        
+        # Input/Output Frame
+        io_frame = ctk.CTkFrame(main_container)
+        io_frame.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(io_frame, text="Input/Output Folders", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Input folder
+        input_frame = ctk.CTkFrame(io_frame)
+        input_frame.pack(fill="x", padx=10, pady=(0, 5))
+        
+        ctk.CTkLabel(input_frame, text="Input:", width=60).pack(side="left", padx=(10, 5))
+        
+        self.input_path_var = ctk.StringVar(value="")
+        self.input_entry = ctk.CTkEntry(
+            input_frame,
+            textvariable=self.input_path_var,
+            placeholder_text="Select input folder",
+            width=430
+        )
+        self.input_entry.pack(side="left", padx=5)
+        
+        self.input_browse_btn = ctk.CTkButton(
+            input_frame,
+            text="Browse...",
+            command=self.browse_input,
+            width=100
+        )
+        self.input_browse_btn.pack(side="left", padx=(5, 10))
+        
+        # Output folder
+        output_frame = ctk.CTkFrame(io_frame)
+        output_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        ctk.CTkLabel(output_frame, text="Output:", width=60).pack(side="left", padx=(10, 5))
+        
+        self.output_path_var = ctk.StringVar(value="")
+        self.output_entry = ctk.CTkEntry(
+            output_frame,
+            textvariable=self.output_path_var,
+            placeholder_text="Select output folder",
+            width=430
+        )
+        self.output_entry.pack(side="left", padx=5)
+        
+        self.output_browse_btn = ctk.CTkButton(
+            output_frame,
+            text="Browse...",
+            command=self.browse_output,
+            width=100
+        )
+        self.output_browse_btn.pack(side="left", padx=(5, 10))
+        
+        # File info and format selection
+        info_frame = ctk.CTkFrame(main_container)
+        info_frame.pack(fill="x", pady=(0, 15))
+        
+        self.files_label = ctk.CTkLabel(info_frame, text="Files Found: 0 images")
+        self.files_label.pack(side="left", padx=20)
+        
+        ctk.CTkLabel(info_frame, text="Output Format:").pack(side="left", padx=(50, 10))
+        
+        self.format_var = ctk.StringVar(value="TIFF")
+        self.tiff_radio = ctk.CTkRadioButton(info_frame, text="TIFF", variable=self.format_var, value="TIFF")
+        self.tiff_radio.pack(side="left", padx=5)
+        
+        self.jpeg_radio = ctk.CTkRadioButton(info_frame, text="JPEG", variable=self.format_var, value="JPEG")
+        self.jpeg_radio.pack(side="left", padx=5)
+        
+        # Progress Frame
+        progress_frame = ctk.CTkFrame(main_container)
+        progress_frame.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(progress_frame, text="Progress", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(10, 5))
+        
+        self.progress_text = ctk.CTkLabel(progress_frame, text="Ready to process")
+        self.progress_text.pack(anchor="w", padx=20, pady=(0, 5))
+        
+        self.progress_bar = ctk.CTkProgressBar(progress_frame, width=840)
+        self.progress_bar.pack(padx=20, pady=(0, 5))
+        self.progress_bar.set(0)
+        
+        self.time_label = ctk.CTkLabel(progress_frame, text="")
+        self.time_label.pack(anchor="w", padx=20, pady=(0, 10))
+        
+        # Log Frame
+        log_frame = ctk.CTkFrame(main_container)
+        log_frame.pack(fill="both", expand=True, pady=(0, 15))
+        
+        log_header = ctk.CTkFrame(log_frame)
+        log_header.pack(fill="x", padx=10, pady=(10, 5))
+        
+        ctk.CTkLabel(log_header, text="Log", font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
+        
+        self.clear_log_btn = ctk.CTkButton(
+            log_header,
+            text="Clear",
+            command=self.clear_log,
+            width=60,
+            height=25
+        )
+        self.clear_log_btn.pack(side="right")
+        
+        self.log_text = ctk.CTkTextbox(log_frame, height=150, width=840)
+        self.log_text.pack(padx=10, pady=(0, 10))
+        
+        # Control Buttons Frame
+        control_frame = ctk.CTkFrame(main_container)
+        control_frame.pack(fill="x")
+        
+        self.process_btn = ctk.CTkButton(
+            control_frame,
+            text="▶ Start Processing",
+            command=self.start_processing,
+            width=150,
+            height=40,
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        self.process_btn.pack(side="left", padx=(20, 10))
+        
+        self.cancel_btn = ctk.CTkButton(
+            control_frame,
+            text="■ Cancel",
+            command=self.cancel_process,
+            width=100,
+            height=40,
+            state="disabled"
+        )
+        self.cancel_btn.pack(side="left", padx=5)
+        
+        # Theme toggle
+        self.theme_btn = ctk.CTkButton(
+            control_frame,
+            text="🌙 Dark Mode",
+            command=self.toggle_theme,
+            width=120,
+            height=40
+        )
+        self.theme_btn.pack(side="right", padx=(10, 20))
+        
+    def browse_model(self):
+        """Browse for model file"""
+        filename = filedialog.askopenfilename(
+            title="Select Model File",
+            filetypes=[
+                ("Model files", "*.pth"),
+                ("All files", "*.*")
+            ]
+        )
+        if filename:
+            self.model_path_var.set(filename)
+            self.log(f"Model selected: {Path(filename).name}")
+    
+    def browse_input(self):
+        """Browse for input folder"""
+        folder = filedialog.askdirectory(title="Select Input Folder")
+        if folder:
+            self.input_path_var.set(folder)
+            self.scan_input_folder()
+    
+    def browse_output(self):
+        """Browse for output folder"""
+        folder = filedialog.askdirectory(title="Select Output Folder")
+        if folder:
+            self.output_path_var.set(folder)
+            self.log(f"Output folder selected: {folder}")
+    
+    def scan_input_folder(self):
+        """Scan input folder for supported images"""
+        input_path = Path(self.input_path_var.get())
+        if not input_path.exists():
+            return
+        
+        # Get all files
+        all_files = list(input_path.iterdir())
+        
+        # Filter supported formats
+        self.input_files = ImageProcessor.filter_supported_files(all_files)
+        
+        # Count by type
+        gpr_count = len([f for f in self.input_files if f.suffix.lower() == '.gpr'])
+        other_count = len(self.input_files) - gpr_count
+        
+        # Update display
+        total = len(self.input_files)
+        if total > 0:
+            file_info = f"Files Found: {total} images"
+            if gpr_count > 0:
+                file_info += f" ({gpr_count} GPR)"
+            self.files_label.configure(text=file_info)
+            self.log(f"Found {total} supported images in {input_path.name}")
+        else:
+            self.files_label.configure(text="Files Found: 0 images")
+            self.log(f"No supported images found in {input_path.name}")
+    
+    def validate_inputs(self) -> bool:
+        """Validate all inputs before processing"""
+        
+        # Check model path
+        if not self.model_path_var.get():
+            messagebox.showerror("Error", "Please select a model file")
+            return False
+        
+        model_path = Path(self.model_path_var.get())
+        if not model_path.exists():
+            messagebox.showerror("Error", "Model file does not exist")
+            return False
+        
+        # Check input folder
+        if not self.input_path_var.get():
+            messagebox.showerror("Error", "Please select an input folder")
+            return False
+        
+        if not self.input_files:
+            messagebox.showerror("Error", "No supported images found in input folder")
+            return False
+        
+        # Check output folder
+        if not self.output_path_var.get():
+            messagebox.showerror("Error", "Please select an output folder")
+            return False
+        
+        return True
+    
+    def start_processing(self):
+        """Start processing images"""
+        if not self.validate_inputs():
+            return
+        
+        # Disable controls
+        self.processing = True
+        self.cancel_processing = False
+        self.set_controls_enabled(False)
+        self.cancel_btn.configure(state="normal")
+        
+        # Start processing in background thread
+        thread = threading.Thread(target=self.process_images_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def process_images_thread(self):
+        """Process images in background thread"""
+        try:
+            # Initialize processor
+            model_path = self.model_path_var.get()
+            self.processor = ImageProcessor(model_path)
+            
+            self.log("Loading model...")
+            self.processor.load_model()
+            self.log("Model loaded successfully")
+            
+            # Setup paths
+            output_dir = Path(self.output_path_var.get())
+            output_format = self.format_var.get()
+            
+            # Track timing
+            start_time = datetime.now()
+            
+            # Process batch
+            self.log(f"Starting batch processing of {len(self.input_files)} images...")
+            
+            results = self.processor.process_batch(
+                self.input_files,
+                output_dir,
+                output_format,
+                progress_callback=self.update_progress,
+                cancel_check=lambda: self.cancel_processing
+            )
+            
+            # Summary
+            successful = sum(1 for _, _, success, _ in results if success)
+            failed = len(results) - successful
+            
+            elapsed = datetime.now() - start_time
+            
+            if self.cancel_processing:
+                self.log(f"Processing cancelled. Completed {successful} of {len(self.input_files)} images")
+            else:
+                self.log(f"Batch processing complete!")
+                self.log(f"Successfully processed: {successful} images")
+                if failed > 0:
+                    self.log(f"Failed: {failed} images")
+                self.log(f"Total time: {str(elapsed).split('.')[0]}")
+            
+            # Show completion message
+            if not self.cancel_processing:
+                self.after(0, lambda: messagebox.showinfo(
+                    "Processing Complete",
+                    f"Successfully processed {successful} of {len(self.input_files)} images\n"
+                    f"Time elapsed: {str(elapsed).split('.')[0]}"
+                ))
+            
+        except Exception as e:
+            error_msg = f"Processing error: {str(e)}"
+            logger.error(error_msg)
+            self.log(error_msg)
+            self.after(0, lambda: messagebox.showerror("Error", error_msg))
+        
+        finally:
+            # Re-enable controls
+            self.processing = False
+            self.after(0, lambda: self.set_controls_enabled(True))
+            self.after(0, lambda: self.cancel_btn.configure(state="disabled"))
+            self.after(0, lambda: self.progress_bar.set(0))
+            self.after(0, lambda: self.progress_text.configure(text="Ready to process"))
+            self.after(0, lambda: self.time_label.configure(text=""))
+    
+    def update_progress(self, current: int, total: int, filename: str, status: str):
+        """Update progress display"""
+        progress = current / total if total > 0 else 0
+        
+        # Calculate time estimates
+        if hasattr(self, 'process_start_time'):
+            if current > 0:
+                elapsed = datetime.now() - self.process_start_time
+                per_image = elapsed / current
+                remaining = per_image * (total - current)
+                time_text = f"Time Elapsed: {str(elapsed).split('.')[0]} | Est. Remaining: {str(remaining).split('.')[0]}"
+            else:
+                time_text = ""
+        else:
+            self.process_start_time = datetime.now()
+            time_text = ""
+        
+        # Update UI in main thread
+        self.after(0, lambda: self.progress_bar.set(progress))
+        self.after(0, lambda: self.progress_text.configure(
+            text=f"Processing: {filename} ({current}/{total}) - {status}"
+        ))
+        self.after(0, lambda: self.time_label.configure(text=time_text))
+        
+        # Log status
+        if "Complete" in status:
+            self.log(f"✓ {filename} processed")
+        elif "Failed" in status:
+            self.log(f"✗ {filename} failed: {status.replace('Failed: ', '')}")
+    
+    def cancel_process(self):
+        """Cancel ongoing processing"""
+        self.cancel_processing = True
+        self.log("Cancelling processing...")
+        self.cancel_btn.configure(state="disabled")
+    
+    def set_controls_enabled(self, enabled: bool):
+        """Enable/disable controls during processing"""
+        state = "normal" if enabled else "disabled"
+        self.model_browse_btn.configure(state=state)
+        self.input_browse_btn.configure(state=state)
+        self.output_browse_btn.configure(state=state)
+        self.process_btn.configure(state=state)
+        self.tiff_radio.configure(state=state)
+        self.jpeg_radio.configure(state=state)
+    
+    def log(self, message: str):
+        """Add message to log"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_entry = f"[{timestamp}] {message}\n"
+        self.after(0, lambda: self.log_text.insert("end", log_entry))
+        self.after(0, lambda: self.log_text.see("end"))
+        logger.info(message)
+    
+    def clear_log(self):
+        """Clear the log text"""
+        self.log_text.delete("1.0", "end")
+    
+    def toggle_theme(self):
+        """Toggle between dark and light theme"""
+        current = ctk.get_appearance_mode()
+        if current == "Dark":
+            ctk.set_appearance_mode("light")
+            self.theme_btn.configure(text="🌙 Dark Mode")
+        else:
+            ctk.set_appearance_mode("dark")
+            self.theme_btn.configure(text="☀️ Light Mode")
