@@ -76,10 +76,22 @@ jobs:
           echo "cmake is already installed: $(cmake --version | head -1)"
         fi
 
+    - name: Setup MSVC (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: ilammy/msvc-dev-cmd@v1
+
     - name: Install system dependencies (Windows)
       if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
-        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+        # CMake is usually pre-installed, but install if missing
+        if (!(Get-Command cmake -ErrorAction SilentlyContinue)) {
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+        } else {
+          Write-Host "CMake already installed: $(cmake --version)"
+        }
+        # Install Ninja for faster builds
+        choco install ninja -y
 
     - name: Set UTF-8 encoding for Windows
       if: matrix.os == 'windows-latest'
