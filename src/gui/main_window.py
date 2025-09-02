@@ -351,7 +351,9 @@ class UnderwaterEnhancerApp(ctk.CTk):
             
             # Log GPR support status
             if self.processor.gpr_support:
-                self.log("GPR support: Available ✓")
+                import platform
+                check = "[OK]" if platform.system() == "Windows" else "✓"
+                self.log(f"GPR support: Available {check}")
             else:
                 self.log("GPR support: Not available (gpr_tools binary missing)")
             

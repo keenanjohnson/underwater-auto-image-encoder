@@ -81,6 +81,13 @@ jobs:
       run: |
         choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
 
+    - name: Set UTF-8 encoding for Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
+        echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
+      shell: pwsh
+
     - name: Verify build tools
       run: |
         echo "Checking build tools..."
@@ -230,15 +237,20 @@ jobs:
         python -c "
         import os
         import sys
+        import platform
+        
+        # Use ASCII characters on Windows to avoid encoding issues
+        check = '[OK]' if platform.system() == 'Windows' else '✓'
+        cross = '[X]' if platform.system() == 'Windows' else '✗'
         
         expected_path = 'dist/${{ matrix.binary_name }}'
         if os.path.exists(expected_path):
-            print(f'✓ Found {expected_path}')
+            print(f'{check} Found {expected_path}')
             file_size = os.path.getsize(expected_path) if os.path.isfile(expected_path) else 0
             if file_size > 0:
                 print(f'  Size: {file_size / 1024 / 1024:.2f} MB')
         else:
-            print(f'✗ Not found: {expected_path}')
+            print(f'{cross} Not found: {expected_path}')
             sys.exit(1)
         "
 

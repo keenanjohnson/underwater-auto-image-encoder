@@ -32,7 +32,7 @@ def compile_gpr_tools():
             print("Warning: Unix compile script not found")
             return False
     
-    print("✓ gpr_tools compiled successfully")
+    print("[OK] gpr_tools compiled successfully")
     return True
 
 def verify_binary():
@@ -47,12 +47,12 @@ def verify_binary():
         binary_path = Path('binaries/linux/gpr_tools')
     
     if not binary_path.exists():
-        print(f"✗ Binary not found at {binary_path}")
+        print(f"[X] Binary not found at {binary_path}")
         print("Please compile gpr_tools first:")
         print("  ./build_scripts/compile_gpr_tools.sh")
         return False
     
-    print(f"✓ Found binary at {binary_path}")
+    print(f"[OK] Found binary at {binary_path}")
     return True
 
 def install_dependencies():
@@ -70,7 +70,7 @@ def install_dependencies():
         sys.executable, '-m', 'pip', 'install', '-r', 'requirements_gui.txt'
     ], check=True)
     
-    print("✓ Dependencies installed successfully")
+    print("[OK] Dependencies installed successfully")
 
 def create_requirements_file():
     """Create requirements_gui.txt if it doesn't exist"""
@@ -132,7 +132,7 @@ def build_executable():
         print(f"PyInstaller failed: {e}")
         return False
     
-    print("✓ Executable built successfully")
+    print("[OK] Executable built successfully")
     
     # Show output location
     system = platform.system().lower()
