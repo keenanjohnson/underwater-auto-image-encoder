@@ -40,7 +40,8 @@ wheels/
 *.ipynb_checkpoints/
 
 # Machine Learning
-models/
+/models/
+!/src/models/
 checkpoints/
 *.h5
 *.pkl

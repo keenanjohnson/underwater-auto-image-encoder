@@ -227,6 +227,15 @@ jobs:
             print('PIL not available, skipping icon creation')
         "
 
+    - name: Check source files before build
+      run: |
+        echo "Checking src directory structure:"
+        ls -la src/
+        echo "Checking src/models:"
+        ls -la src/models/ || echo "src/models does not exist!"
+        echo "Python files in src:"
+        find src -name "*.py" -type f | sort
+    
     - name: Build with PyInstaller
       run: |
         pyinstaller pyinstaller.spec --clean --noconfirm
