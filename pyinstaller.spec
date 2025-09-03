@@ -3,6 +3,7 @@
 import platform
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
@@ -25,9 +26,12 @@ if not binary_path.exists():
 else:
     binaries = [gpr_binary]
 
+# Collect all src submodules
+src_hiddenimports = collect_submodules('src')
+
 a = Analysis(
     ['app.py'],
-    pathex=[],
+    pathex=['.'],  # Add current directory to path
     binaries=binaries,
     datas=[
         ('src', 'src'),
@@ -46,16 +50,8 @@ a = Analysis(
         'skimage',
         'tkinter',
         'darkdetect',
-        'src.models',
-        'src.models.unet_autoencoder',
-        'src.utils',
-        'src.converters',
-        'src.converters.gpr_converter',
-        'src.gui',
-        'src.gui.main_window',
-        'src.gui.image_processor',
-    ],
-    hookspath=[],
+    ] + src_hiddenimports,  # Add all src submodules
+    hookspath=['.'],  # Use local hooks directory
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
