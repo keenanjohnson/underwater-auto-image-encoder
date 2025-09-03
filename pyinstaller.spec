@@ -2,8 +2,13 @@
 
 import platform
 import sys
+import os
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+
+# Ensure src is importable
+spec_dir = os.path.dirname(os.path.abspath(SPECPATH))
+sys.path.insert(0, spec_dir)
 
 block_cipher = None
 
@@ -48,14 +53,20 @@ try:
 except:
     src_hiddenimports = src_modules
 
+# Ensure all src Python files are included
+src_files = []
+for root, dirs, files in os.walk('src'):
+    for file in files:
+        if file.endswith('.py'):
+            src_files.append((os.path.join(root, file), root))
+
 a = Analysis(
     ['app.py'],
     pathex=[str(Path.cwd())],  # Add absolute path to current directory
     binaries=binaries,
     datas=[
-        ('src', 'src'),  # Include src directory
         ('config.yaml', '.') if Path('config.yaml').exists() else ('config.yaml', '.'),
-    ],
+    ] + src_files,  # Include all Python files from src
     hiddenimports=[
         'customtkinter',
         'torch',
