@@ -353,7 +353,16 @@ class UnderwaterEnhancerApp(ctk.CTk):
         try:
             # Initialize processor
             model_path = self.model_path_var.get()
-            self.processor = ImageProcessor(model_path)
+            # Check if config.yaml exists in the same directory as the model
+            model_dir = Path(model_path).parent
+            config_path = model_dir / "config.yaml"
+            if not config_path.exists():
+                # Try in the project root
+                config_path = Path("config.yaml")
+                if not config_path.exists():
+                    config_path = None
+            
+            self.processor = ImageProcessor(model_path, str(config_path) if config_path else None)
             
             # Log GPR support status
             if self.processor.gpr_support:
@@ -365,7 +374,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
             
             self.log("Loading model...")
             self.processor.load_model()
-            self.log("Model loaded successfully - Processing at full resolution")
+            self.log("Model loaded successfully - Full resolution processing enabled (with tiling for large images)")
             
             # Setup paths
             output_dir = Path(self.output_path_var.get())

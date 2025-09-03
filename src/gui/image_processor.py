@@ -37,14 +37,16 @@ class ImageProcessor:
             logger.warning("GPR support is not available - gpr_tools binary not found")
         
     def load_model(self):
-        """Load the ML model - always at full resolution"""
+        """Load the ML model - matching inference.py exactly"""
         if not self.inferencer:
+            # Create inferencer exactly like inference.py
             self.inferencer = Inferencer(self.model_path, self.config_path)
             
-            # Always force full-size processing (no resizing) - safely set the config
-            self.inferencer.config.setdefault('inference', {})['resize_inference'] = False
+            # Override config for full-size processing exactly like inference.py --full-size
+            config_override = {'inference': {'resize_inference': False}}
+            self.inferencer.config.update(config_override)
             self.inferencer.setup_transforms()  # Refresh transforms with new config
-            logger.info(f"Model loaded from {self.model_path} - Full resolution (4606×4030)")
+            logger.info(f"Model loaded from {self.model_path} - Full resolution processing enabled")
     
     def process_image(self, input_path: Path, output_path: Path, 
                      output_format: str = 'TIFF') -> Path:
@@ -73,8 +75,9 @@ class ImageProcessor:
             tiff_path = self.gpr_converter.convert(input_path, output_path=None)
             
             try:
-                # Process the TIFF
-                result = self.inferencer.process_image(tiff_path, output_path)
+                # Process the TIFF using inferencer exactly like inference.py
+                # The inferencer.process_image method will handle tiling for large images
+                output_img = self.inferencer.process_image(tiff_path, output_path)
             finally:
                 # Clean up temp TIFF
                 if tiff_path and tiff_path.exists():
@@ -95,8 +98,9 @@ class ImageProcessor:
             
             return output_path
         else:
-            # Direct processing for TIFF/JPEG
-            result = self.inferencer.process_image(input_path, output_path)
+            # Direct processing for TIFF/JPEG - using inferencer exactly like inference.py
+            # The inferencer.process_image method will handle tiling for large images
+            output_img = self.inferencer.process_image(input_path, output_path)
             
             # Convert output format if needed
             if output_format.upper() == 'JPEG' and not output_path.suffix.lower() in ['.jpg', '.jpeg']:

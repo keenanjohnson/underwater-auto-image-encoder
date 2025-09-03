@@ -90,10 +90,11 @@ class GPRConverter:
                 import imageio
                 
                 # Use rawpy to read DNG and convert to TIFF
+                # Match preprocess_images.py exactly: no_auto_bright=True
                 with rawpy.imread(str(dng_path)) as raw:
                     rgb = raw.postprocess(
                         use_camera_wb=True,
-                        no_auto_bright=False,
+                        no_auto_bright=True,  # Match preprocess_images.py - no auto brightness
                         output_bps=16
                     )
                 
