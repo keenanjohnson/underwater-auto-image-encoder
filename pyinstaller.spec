@@ -60,11 +60,7 @@ for root, dirs, files in os.walk('src'):
         if file.endswith('.py'):
             src_files.append((os.path.join(root, file), root))
 
-# Debug: Print collected files
-print(f"Collecting {len(src_files)} Python files from src:")
-for src_file, dest in src_files:
-    if 'models' in src_file:
-        print(f"  Models file: {src_file} -> {dest}")
+# Silently collect files (debug output removed)
 
 a = Analysis(
     ['app.py'],

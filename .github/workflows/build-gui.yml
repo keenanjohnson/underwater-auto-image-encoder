@@ -230,11 +230,11 @@ jobs:
     - name: Check source files before build
       run: |
         echo "Checking src directory structure:"
-        ls -la src/
+        python -c "import os; print('\n'.join(os.listdir('src')))"
         echo "Checking src/models:"
-        ls -la src/models/ || echo "src/models does not exist!"
+        python -c "import os; print('\n'.join(os.listdir('src/models')) if os.path.exists('src/models') else 'src/models does not exist!')"
         echo "Python files in src:"
-        find src -name "*.py" -type f | sort
+        python -c "import os; [print(os.path.join(r, f)) for r, d, files in os.walk('src') for f in sorted(files) if f.endswith('.py')]"
     
     - name: Build with PyInstaller
       run: |
@@ -310,16 +310,8 @@ jobs:
         test -f dist/UnderwaterEnhancer.app/Contents/Info.plist || (echo "Info.plist not found!" && exit 1)
         echo "  [OK] App bundle structure valid"
         
-        # Debug: Check if src files are actually in the bundle
-        echo "Checking for src files in bundle..."
-        find dist/UnderwaterEnhancer.app -name "*.py" -path "*/src/*" | head -10 || echo "No Python files found in src"
-        find dist/UnderwaterEnhancer.app -name "unet_autoencoder.py" || echo "unet_autoencoder.py not found"
-        ls -la dist/UnderwaterEnhancer.app/Contents/Resources/src/models/ 2>/dev/null || echo "src/models not in Resources"
-        ls -la dist/UnderwaterEnhancer.app/Contents/Frameworks/src/models/ 2>/dev/null || echo "src/models not in Frameworks"
-        
         # Test binary can execute and import modules
         echo "Testing binary execution..."
-        export CI=1  # Enable debug output
         dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer --smoke-test
 
     - name: Create release archive (Linux)
