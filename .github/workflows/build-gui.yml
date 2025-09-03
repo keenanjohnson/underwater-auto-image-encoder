@@ -277,6 +277,34 @@ jobs:
             sys.exit(1)
         "
 
+    - name: Smoke test - Test binary startup (Linux/Windows)
+      if: matrix.os != 'macos-latest'
+      run: |
+        echo "Testing binary startup and imports..."
+        
+        # Run smoke test
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          dist/UnderwaterEnhancer.exe --smoke-test
+        else
+          dist/UnderwaterEnhancer --smoke-test
+        fi
+      shell: bash
+
+    - name: Smoke test - Test macOS app bundle
+      if: matrix.os == 'macos-latest'
+      run: |
+        echo "Testing macOS app bundle structure and startup..."
+        
+        # Check app bundle structure
+        echo "Checking app bundle structure..."
+        test -f dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer || (echo "Binary not found!" && exit 1)
+        test -f dist/UnderwaterEnhancer.app/Contents/Info.plist || (echo "Info.plist not found!" && exit 1)
+        echo "  [OK] App bundle structure valid"
+        
+        # Test binary can execute and import modules
+        echo "Testing binary execution..."
+        dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer --smoke-test
+
     - name: Create release archive (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
