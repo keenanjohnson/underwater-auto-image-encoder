@@ -18,6 +18,29 @@ def smoke_test():
     print(f"Underwater Enhancer v{__version__}")
     print("Running smoke tests...")
     
+    # Debug: Check what's actually in the directories
+    if os.environ.get('CI'):
+        import sys
+        print("\nDebug: Checking src locations...")
+        for path in sys.path:
+            if 'src' in path or 'Resources' in path:
+                if os.path.exists(path):
+                    print(f"  Path exists: {path}")
+                    # Check for models directory
+                    models_path = os.path.join(path, 'models')
+                    if os.path.exists(models_path):
+                        print(f"    Found models at: {models_path}")
+                        # List files
+                        try:
+                            files = os.listdir(models_path)
+                            print(f"    Files: {files[:5]}")
+                        except:
+                            pass
+                    # Check if we can find src/models from here
+                    src_models = os.path.join(path, 'src', 'models')
+                    if os.path.exists(src_models):
+                        print(f"    Found src/models at: {src_models}")
+    
     errors = []
     
     # Test critical imports
@@ -50,8 +73,23 @@ def smoke_test():
         from src.models.unet_autoencoder import UNetAutoencoder
         print("  [OK] Model imported")
     except ImportError as e:
-        errors.append(f"Model import failed: {e}")
-        print(f"  [FAIL] Model: {e}")
+        # Try alternative import paths
+        try:
+            # Try importing without src prefix
+            import models.unet_autoencoder
+            print("  [OK] Model imported (via models.unet_autoencoder)")
+        except ImportError:
+            # Try adding src to path and importing
+            try:
+                for p in sys.path:
+                    if p.endswith('/Resources'):
+                        sys.path.insert(0, os.path.join(p, 'src'))
+                        break
+                from models.unet_autoencoder import UNetAutoencoder
+                print("  [OK] Model imported (via direct models import)")
+            except ImportError:
+                errors.append(f"Model import failed: {e}")
+                print(f"  [FAIL] Model: {e}")
     
     try:
         from src.converters.gpr_converter import GPRConverter

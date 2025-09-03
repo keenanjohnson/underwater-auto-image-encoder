@@ -301,8 +301,16 @@ jobs:
         test -f dist/UnderwaterEnhancer.app/Contents/Info.plist || (echo "Info.plist not found!" && exit 1)
         echo "  [OK] App bundle structure valid"
         
+        # Debug: Check if src files are actually in the bundle
+        echo "Checking for src files in bundle..."
+        find dist/UnderwaterEnhancer.app -name "*.py" -path "*/src/*" | head -10 || echo "No Python files found in src"
+        find dist/UnderwaterEnhancer.app -name "unet_autoencoder.py" || echo "unet_autoencoder.py not found"
+        ls -la dist/UnderwaterEnhancer.app/Contents/Resources/src/models/ 2>/dev/null || echo "src/models not in Resources"
+        ls -la dist/UnderwaterEnhancer.app/Contents/Frameworks/src/models/ 2>/dev/null || echo "src/models not in Frameworks"
+        
         # Test binary can execute and import modules
         echo "Testing binary execution..."
+        export CI=1  # Enable debug output
         dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer --smoke-test
 
     - name: Create release archive (Linux)
