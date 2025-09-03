@@ -26,15 +26,34 @@ if not binary_path.exists():
 else:
     binaries = [gpr_binary]
 
-# Collect all src submodules
-src_hiddenimports = collect_submodules('src')
+# Manually list all src modules since collect_submodules doesn't work in CI
+src_modules = [
+    'src',
+    'src.models',
+    'src.models.unet_autoencoder',
+    'src.models.attention_unet',
+    'src.utils',
+    'src.converters',
+    'src.converters.gpr_converter',
+    'src.gui',
+    'src.gui.main_window',
+    'src.gui.image_processor',
+]
+
+# Try to collect submodules, fallback to manual list
+try:
+    src_hiddenimports = collect_submodules('src')
+    if not src_hiddenimports:
+        src_hiddenimports = src_modules
+except:
+    src_hiddenimports = src_modules
 
 a = Analysis(
     ['app.py'],
-    pathex=['.'],  # Add current directory to path
+    pathex=[str(Path.cwd())],  # Add absolute path to current directory
     binaries=binaries,
     datas=[
-        ('src', 'src'),
+        ('src', 'src'),  # Include src directory
         ('config.yaml', '.') if Path('config.yaml').exists() else ('config.yaml', '.'),
     ],
     hiddenimports=[
@@ -53,7 +72,7 @@ a = Analysis(
     ] + src_hiddenimports,  # Add all src submodules
     hookspath=['.'],  # Use local hooks directory
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['runtime_hook.py'],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
