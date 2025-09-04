@@ -478,6 +478,9 @@ class UnderwaterEnhancerApp(ctk.CTk):
             self.log(f"✓ {filename} processed")
         elif "Failed" in status:
             self.log(f"✗ {filename} failed: {status.replace('Failed: ', '')}")
+        elif "tile" in status.lower():
+            # Log tile processing updates
+            self.log(f"  • {filename}: {status.replace('Processing - ', '')}")
     
     def cancel_process(self):
         """Cancel ongoing processing"""

@@ -49,7 +49,7 @@ class ImageProcessor:
             logger.info(f"Model loaded from {self.model_path} - Full resolution processing enabled")
     
     def process_image(self, input_path: Path, output_path: Path, 
-                     output_format: str = 'TIFF') -> Path:
+                     output_format: str = 'TIFF', progress_callback=None) -> Path:
         """
         Process a single image, handling GPR conversion if needed
         
@@ -57,6 +57,7 @@ class ImageProcessor:
             input_path: Path to input image
             output_path: Path for output image
             output_format: Output format ('TIFF' or 'JPEG')
+            progress_callback: Optional callback for progress updates
         
         Returns:
             Path to processed image
@@ -77,7 +78,7 @@ class ImageProcessor:
             try:
                 # Process the TIFF using inferencer exactly like inference.py
                 # The inferencer.process_image method will handle tiling for large images
-                output_img = self.inferencer.process_image(tiff_path, output_path)
+                output_img = self.inferencer.process_image(tiff_path, output_path, progress_callback=progress_callback)
             finally:
                 # Clean up temp TIFF
                 if tiff_path and tiff_path.exists():
@@ -100,7 +101,7 @@ class ImageProcessor:
         else:
             # Direct processing for TIFF/JPEG - using inferencer exactly like inference.py
             # The inferencer.process_image method will handle tiling for large images
-            output_img = self.inferencer.process_image(input_path, output_path)
+            output_img = self.inferencer.process_image(input_path, output_path, progress_callback=progress_callback)
             
             # Convert output format if needed
             if output_format.upper() == 'JPEG' and not output_path.suffix.lower() in ['.jpg', '.jpeg']:
@@ -154,8 +155,14 @@ class ImageProcessor:
             output_path = output_dir / f"{input_path.stem}_enhanced{ext}"
             
             try:
-                # Process the image
-                actual_output = self.process_image(input_path, output_path, output_format)
+                # Create a callback to pass tile updates to the main progress callback
+                def tile_progress(message):
+                    if progress_callback:
+                        # Append tile info to the current file status
+                        progress_callback(i, len(input_files), input_path.name, f"Processing - {message}")
+                
+                # Process the image with tile progress callback
+                actual_output = self.process_image(input_path, output_path, output_format, progress_callback=tile_progress)
                 results.append((input_path, actual_output, True, "Success"))
                 
                 if progress_callback:
