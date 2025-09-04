@@ -19,56 +19,11 @@ REM Update to latest and reset any changes
 git reset --hard HEAD
 git pull
 
-REM Apply MSVC compatibility patches
-echo Applying MSVC compatibility patches...
-
-REM Patch xmltok.h
-echo Patching xmltok.h for fallthrough macro...
-findstr /C:"define fallthrough" source\lib\expat_lib\xmltok.h >nul 2>&1
-if %errorlevel% neq 0 (
-    echo /* MSVC compatibility - define fallthrough as do-while */ > source\lib\expat_lib\xmltok.h.tmp
-    echo #ifdef _MSC_VER >> source\lib\expat_lib\xmltok.h.tmp
-    echo #define fallthrough do {} while(0) >> source\lib\expat_lib\xmltok.h.tmp
-    echo #endif >> source\lib\expat_lib\xmltok.h.tmp
-    echo. >> source\lib\expat_lib\xmltok.h.tmp
-    type source\lib\expat_lib\xmltok.h >> source\lib\expat_lib\xmltok.h.tmp
-    move /y source\lib\expat_lib\xmltok.h.tmp source\lib\expat_lib\xmltok.h
-    echo Patched xmltok.h
-) else (
-    echo xmltok.h already patched
-)
-
-REM Also patch xmltok_impl.c directly since it's included
-echo Patching xmltok_impl.c for fallthrough macro...
-findstr /C:"define fallthrough" source\lib\expat_lib\xmltok_impl.c >nul 2>&1
-if %errorlevel% neq 0 (
-    echo /* MSVC compatibility - define fallthrough as do-while */ > source\lib\expat_lib\xmltok_impl.c.tmp
-    echo #ifdef _MSC_VER >> source\lib\expat_lib\xmltok_impl.c.tmp
-    echo #define fallthrough do {} while(0) >> source\lib\expat_lib\xmltok_impl.c.tmp
-    echo #endif >> source\lib\expat_lib\xmltok_impl.c.tmp
-    echo. >> source\lib\expat_lib\xmltok_impl.c.tmp
-    type source\lib\expat_lib\xmltok_impl.c >> source\lib\expat_lib\xmltok_impl.c.tmp
-    move /y source\lib\expat_lib\xmltok_impl.c.tmp source\lib\expat_lib\xmltok_impl.c
-    echo Patched xmltok_impl.c
-) else (
-    echo xmltok_impl.c already patched
-)
-
-REM Also patch xmltok.c since it includes xmltok_impl.c
-echo Patching xmltok.c for fallthrough macro...
-findstr /C:"define fallthrough" source\lib\expat_lib\xmltok.c >nul 2>&1
-if %errorlevel% neq 0 (
-    echo /* MSVC compatibility - define fallthrough as do-while */ > source\lib\expat_lib\xmltok.c.tmp
-    echo #ifdef _MSC_VER >> source\lib\expat_lib\xmltok.c.tmp
-    echo #define fallthrough do {} while(0) >> source\lib\expat_lib\xmltok.c.tmp
-    echo #endif >> source\lib\expat_lib\xmltok.c.tmp
-    echo. >> source\lib\expat_lib\xmltok.c.tmp
-    type source\lib\expat_lib\xmltok.c >> source\lib\expat_lib\xmltok.c.tmp
-    move /y source\lib\expat_lib\xmltok.c.tmp source\lib\expat_lib\xmltok.c
-    echo Patched xmltok.c
-) else (
-    echo xmltok.c already patched
-)
+REM Remove fallthrough statements that cause issues with MSVC
+echo Removing problematic fallthrough statements for MSVC compatibility...
+powershell -Command "(Get-Content source\lib\expat_lib\xmltok_impl.c) -replace 'fallthrough;', '/* fallthrough */;' | Set-Content source\lib\expat_lib\xmltok_impl.c"
+powershell -Command "(Get-Content source\lib\expat_lib\xmltok.c) -replace 'fallthrough;', '/* fallthrough */;' | Set-Content source\lib\expat_lib\xmltok.c"
+echo Patched source files for MSVC
 
 REM Clean and create build directory
 if exist build (
@@ -114,7 +69,7 @@ if defined CI (
         )
     )
 ) else (
-    REM Try with MSVC compatibility flags for local builds
+    REM Try with MSVC compatibility flags for local builds  
     set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
     set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS /EHsc"
     
