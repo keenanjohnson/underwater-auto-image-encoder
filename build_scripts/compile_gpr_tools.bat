@@ -19,11 +19,38 @@ REM Update to latest and reset any changes
 git reset --hard HEAD
 git pull
 
-REM Define fallthrough macro for MSVC
-echo Defining fallthrough macro for MSVC compatibility...
+REM Fix MSVC compatibility issues in GPR source
+echo Fixing MSVC compatibility issues...
 
-REM Add fallthrough definition to xmltok.h since it's included by the other files
-powershell -Command "$content = Get-Content 'source\lib\expat_lib\xmltok.h' -Raw; if($content -notmatch 'define fallthrough') { $newContent = '#ifdef _MSC_VER' + [Environment]::NewLine + '#ifndef fallthrough' + [Environment]::NewLine + '#define fallthrough ((void)0)' + [Environment]::NewLine + '#endif' + [Environment]::NewLine + '#endif' + [Environment]::NewLine + [Environment]::NewLine + $content; Set-Content 'source\lib\expat_lib\xmltok.h' -Value $newContent -NoNewline }"
+REM 1. Fix the CMakeLists.txt to not use -std=c99 with MSVC
+echo Patching CMakeLists.txt for MSVC...
+powershell -Command "$content = Get-Content 'CMakeLists.txt' -Raw; $content = $content -replace 'set\(CMAKE_C_FLAGS .*-std=c99.*\)', 'if(NOT MSVC)`r`n    set(CMAKE_C_FLAGS \"`${CMAKE_C_FLAGS} -std=c99\"`)`r`nendif()'; Set-Content 'CMakeLists.txt' -Value $content -NoNewline"
+
+REM 2. Define fallthrough and fix __attribute__ for MSVC in xmltok.h
+echo Adding MSVC compatibility macros to xmltok.h...
+powershell -Command "$header = @'
+#ifdef _MSC_VER
+#ifndef MSVC_COMPAT_DEFINED
+#define MSVC_COMPAT_DEFINED
+#define fallthrough ((void)0)
+#define __attribute__(x)
+#endif
+#endif
+
+'@; $content = Get-Content 'source\lib\expat_lib\xmltok.h' -Raw; if($content -notmatch 'MSVC_COMPAT_DEFINED') { $newContent = $header + $content; Set-Content 'source\lib\expat_lib\xmltok.h' -Value $newContent -NoNewline }"
+
+REM 3. Also add the compatibility macros to xmltok_impl.c
+echo Adding MSVC compatibility macros to xmltok_impl.c...
+powershell -Command "$header = @'
+#ifdef _MSC_VER
+#ifndef MSVC_COMPAT_DEFINED
+#define MSVC_COMPAT_DEFINED
+#define fallthrough ((void)0)
+#define __attribute__(x)
+#endif
+#endif
+
+'@; $content = Get-Content 'source\lib\expat_lib\xmltok_impl.c' -Raw; if($content -notmatch 'MSVC_COMPAT_DEFINED') { $newContent = $header + $content; Set-Content 'source\lib\expat_lib\xmltok_impl.c' -Value $newContent -NoNewline }"
 
 REM Clean and create build directory
 if exist build (
