@@ -43,23 +43,72 @@ if exist CMakeLists.txt.bak (
     echo CMakeLists.txt patched
 )
 
-REM 2. Create compatibility header
+REM 2. Create compatibility header with more comprehensive fixes
 echo Creating MSVC compatibility header...
 echo #ifdef _MSC_VER > msvc_compat.h
 echo #ifndef MSVC_COMPAT_DEFINED >> msvc_compat.h
 echo #define MSVC_COMPAT_DEFINED >> msvc_compat.h
+echo /* Compatibility macros for MSVC */ >> msvc_compat.h
 echo #define fallthrough ((void)0) >> msvc_compat.h
+echo /* Handle various __attribute__ uses */ >> msvc_compat.h
+echo #ifndef __attribute__ >> msvc_compat.h
 echo #define __attribute__(x) >> msvc_compat.h
 echo #endif >> msvc_compat.h
+echo /* Specific calling convention handling */ >> msvc_compat.h
+echo #ifdef XMLCALL >> msvc_compat.h
+echo #undef XMLCALL >> msvc_compat.h
 echo #endif >> msvc_compat.h
+echo #define XMLCALL __cdecl >> msvc_compat.h
+echo #ifdef FASTCALL >> msvc_compat.h
+echo #undef FASTCALL >> msvc_compat.h
+echo #endif >> msvc_compat.h
+echo #define FASTCALL __fastcall >> msvc_compat.h
+echo #ifdef PTRFASTCALL >> msvc_compat.h
+echo #undef PTRFASTCALL >> msvc_compat.h
+echo #endif >> msvc_compat.h
+echo #define PTRFASTCALL __fastcall >> msvc_compat.h
+echo #ifdef FALL_THROUGH >> msvc_compat.h
+echo #undef FALL_THROUGH >> msvc_compat.h
+echo #endif >> msvc_compat.h
+echo #define FALL_THROUGH ((void)0) >> msvc_compat.h
+echo #endif /* MSVC_COMPAT_DEFINED */ >> msvc_compat.h
+echo #endif /* _MSC_VER */ >> msvc_compat.h
 
 REM 3. Prepend include to problematic files
-if not exist source\lib\expat_lib\xmltok.h.bak (
-    copy source\lib\expat_lib\xmltok.h source\lib\expat_lib\xmltok.h.bak
-    echo #include "../../msvc_compat.h" > source\lib\expat_lib\xmltok.h.tmp
-    type source\lib\expat_lib\xmltok.h.bak >> source\lib\expat_lib\xmltok.h.tmp
-    move /y source\lib\expat_lib\xmltok.h.tmp source\lib\expat_lib\xmltok.h
-    echo Patched xmltok.h
+REM Patch xmltok.c
+if not exist source\lib\expat_lib\xmltok.c.bak (
+    copy source\lib\expat_lib\xmltok.c source\lib\expat_lib\xmltok.c.bak
+    echo #include "../../../msvc_compat.h" > source\lib\expat_lib\xmltok.c.tmp
+    type source\lib\expat_lib\xmltok.c.bak >> source\lib\expat_lib\xmltok.c.tmp
+    move /y source\lib\expat_lib\xmltok.c.tmp source\lib\expat_lib\xmltok.c
+    echo Patched xmltok.c
+)
+
+REM Patch xmltok_impl.c
+if not exist source\lib\expat_lib\xmltok_impl.c.bak (
+    copy source\lib\expat_lib\xmltok_impl.c source\lib\expat_lib\xmltok_impl.c.bak
+    echo #include "../../../msvc_compat.h" > source\lib\expat_lib\xmltok_impl.c.tmp
+    type source\lib\expat_lib\xmltok_impl.c.bak >> source\lib\expat_lib\xmltok_impl.c.tmp
+    move /y source\lib\expat_lib\xmltok_impl.c.tmp source\lib\expat_lib\xmltok_impl.c
+    echo Patched xmltok_impl.c
+)
+
+REM Patch expat_external.h
+if not exist source\lib\expat_lib\expat_external.h.bak (
+    copy source\lib\expat_lib\expat_external.h source\lib\expat_lib\expat_external.h.bak
+    echo #include "../../../msvc_compat.h" > source\lib\expat_lib\expat_external.h.tmp
+    type source\lib\expat_lib\expat_external.h.bak >> source\lib\expat_lib\expat_external.h.tmp
+    move /y source\lib\expat_lib\expat_external.h.tmp source\lib\expat_lib\expat_external.h
+    echo Patched expat_external.h
+)
+
+REM Patch internal.h
+if not exist source\lib\expat_lib\internal.h.bak (
+    copy source\lib\expat_lib\internal.h source\lib\expat_lib\internal.h.bak
+    echo #include "../../../msvc_compat.h" > source\lib\expat_lib\internal.h.tmp
+    type source\lib\expat_lib\internal.h.bak >> source\lib\expat_lib\internal.h.tmp
+    move /y source\lib\expat_lib\internal.h.tmp source\lib\expat_lib\internal.h
+    echo Patched internal.h
 )
 
 REM Clean and create build directory
@@ -77,9 +126,9 @@ echo Configuring with CMake...
 REM Check if running in CI
 if defined CI (
     echo Running in CI environment...
-    REM For MSVC, disable some warnings
-    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
-    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS /EHsc"
+    REM For MSVC, disable some warnings and add compatibility defines
+    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS /D_MSVC_COMPAT"
+    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS /D_MSVC_COMPAT /EHsc"
     
     REM Try Ninja first (faster)
     where ninja >nul 2>nul
@@ -108,8 +157,8 @@ if defined CI (
     )
 ) else (
     REM Try with MSVC compatibility flags for local builds  
-    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
-    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS /EHsc"
+    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS /D_MSVC_COMPAT"
+    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS /D_MSVC_COMPAT /EHsc"
     
     echo Trying Visual Studio generator with MSVC compatibility...
     cmake -G "Visual Studio 17 2022" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"
