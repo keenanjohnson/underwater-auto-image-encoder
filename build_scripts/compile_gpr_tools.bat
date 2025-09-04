@@ -19,46 +19,92 @@ REM Update to latest and reset any changes
 git reset --hard HEAD
 git pull
 
-REM Fix MSVC compatibility issues using the simple patch approach
+REM Apply MSVC compatibility fixes using git patch
 echo Fixing MSVC compatibility issues...
 
-REM Apply the patch to xmltok.h - this is the key file that needs patching
-echo Patching CMakeLists.txt for MSVC...
-if not exist CMakeLists.txt.bak (
-    copy CMakeLists.txt CMakeLists.txt.bak
-    REM Create a simple patch that handles MSVC C99 standard flag
-    (
-        echo # MSVC Compatibility - don't use -std=c99 flag for MSVC
-        echo if^(MSVC^)
-        echo     # MSVC doesn't support -std=c99 flag, and already defaults to C99-compatible mode
-        echo     add_definitions^(-D_CRT_SECURE_NO_WARNINGS^)
-        echo else^(^)
-        echo     set^(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99"^)
-        echo endif^(^)
-        echo.
-        type CMakeLists.txt.bak
-    ) > CMakeLists.txt
-    echo CMakeLists.txt patched
-)
+REM Create a comprehensive patch for MSVC compatibility
+echo Creating MSVC compatibility patch...
+(
+echo From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+echo From: Build Script ^<build@example.com^>
+echo Date: Wed, 1 Jan 2025 00:00:00 +0000
+echo Subject: [PATCH] Add MSVC compatibility fixes
+echo.
+echo diff --git a/source/lib/expat_lib/xmltok.h b/source/lib/expat_lib/xmltok.h
+echo index 1234567..abcdefg 100644
+echo --- a/source/lib/expat_lib/xmltok.h
+echo +++ b/source/lib/expat_lib/xmltok.h
+echo @@ -1,5 +1,10 @@
+echo  /* Copyright ^(c^) 1998, 1999 Thai Open Source Software Center Ltd
+echo     See the file COPYING for copying permission.
+echo +*/
+echo +
+echo +/* MSVC compatibility - define fallthrough as empty */
+echo +#ifdef _MSC_VER
+echo +#define fallthrough
+echo +#endif
+echo  
+echo  #ifndef XmlTok_INCLUDED
+echo diff --git a/CMakeLists.txt b/CMakeLists.txt
+echo index 1234567..abcdefg 100644
+echo --- a/CMakeLists.txt
+echo +++ b/CMakeLists.txt
+echo @@ -1,3 +1,10 @@
+echo +# MSVC Compatibility
+echo +if^(MSVC^)
+echo +    add_definitions^(-D_CRT_SECURE_NO_WARNINGS^)
+echo +    # MSVC doesn't need -std=c99, ignore if it appears later
+echo +else^(^)
+echo +    set^(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99"^)
+echo +endif^(^)
+echo +
+echo  cmake_minimum_required^(VERSION 3.5 FATAL_ERROR^)
+echo.
+echo  if^(POLICY CMP0048^)
+) > msvc_compat.patch
 
-REM Apply the xmltok.h patch to define fallthrough for MSVC
-echo Creating MSVC compatibility header...
-if not exist source\lib\expat_lib\xmltok.h.bak (
-    copy source\lib\expat_lib\xmltok.h source\lib\expat_lib\xmltok.h.bak
-    REM Apply the patch inline - add fallthrough definition after the copyright notice
-    (
-        echo /* Copyright ^(c^) 1998, 1999 Thai Open Source Software Center Ltd
-        echo    See the file COPYING for copying permission.
-        echo */
-        echo.
-        echo /* MSVC compatibility - define fallthrough as empty */
-        echo #ifdef _MSC_VER
-        echo #define fallthrough
-        echo #endif
-        echo.
-        more +3 source\lib\expat_lib\xmltok.h.bak
-    ) > source\lib\expat_lib\xmltok.h
-    echo Patched xmltok.h
+REM Apply the patch
+git apply --ignore-whitespace msvc_compat.patch
+if %errorlevel% neq 0 (
+    echo Git patch failed, trying manual approach...
+    REM Fallback to manual patching
+    
+    REM Patch CMakeLists.txt
+    if not exist CMakeLists.txt.bak (
+        copy CMakeLists.txt CMakeLists.txt.bak
+        (
+            echo # MSVC Compatibility
+            echo if^(MSVC^)
+            echo     add_definitions^(-D_CRT_SECURE_NO_WARNINGS^)
+            echo     # MSVC doesn't need -std=c99
+            echo else^(^)
+            echo     set^(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99"^)
+            echo endif^(^)
+            echo.
+            type CMakeLists.txt.bak
+        ) > CMakeLists.txt
+        echo CMakeLists.txt patched manually
+    )
+    
+    REM Patch xmltok.h manually
+    if not exist source\lib\expat_lib\xmltok.h.bak (
+        copy source\lib\expat_lib\xmltok.h source\lib\expat_lib\xmltok.h.bak
+        (
+            echo /* Copyright ^(c^) 1998, 1999 Thai Open Source Software Center Ltd
+            echo    See the file COPYING for copying permission.
+            echo */
+            echo.
+            echo /* MSVC compatibility - define fallthrough as empty */
+            echo #ifdef _MSC_VER
+            echo #define fallthrough
+            echo #endif
+            echo.
+            more +3 source\lib\expat_lib\xmltok.h.bak
+        ) > source\lib\expat_lib\xmltok.h
+        echo xmltok.h patched manually
+    )
+) else (
+    echo MSVC compatibility patch applied successfully
 )
 
 REM Clean and create build directory
@@ -76,11 +122,11 @@ REM Check if running in CI
 if defined CI (
     echo Running in CI environment...
     
-    REM Try Ninja first (faster) with proper MSVC flags
+    REM Try Ninja first (faster)
     where ninja >nul 2>nul
     if %errorlevel% equ 0 (
         echo Using Ninja generator with MSVC compatibility flags...
-        cmake -G "Ninja" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="/D_CRT_SECURE_NO_WARNINGS" -DCMAKE_CXX_FLAGS="/D_CRT_SECURE_NO_WARNINGS /EHsc"
+        cmake -G "Ninja" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
         if %errorlevel% equ 0 (
             ninja
         ) else (
@@ -103,7 +149,7 @@ if defined CI (
     )
 ) else (
     REM For local builds
-    echo Trying Visual Studio generator with MSVC compatibility...
+    echo Trying Visual Studio generator...
     cmake -G "Visual Studio 17 2022" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
     if %errorlevel% neq 0 (
         echo VS2022 not found, trying VS2019...
