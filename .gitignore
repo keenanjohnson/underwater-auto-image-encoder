@@ -3,6 +3,10 @@ training_data/
 test_data/
 output/
 
+# gpr_tools binaries
+gpr_tools
+gpr_tools.exe
+
 # OS Files
 .DS_Store
 
@@ -36,7 +40,8 @@ wheels/
 *.ipynb_checkpoints/
 
 # Machine Learning
-models/
+/models/
+!/src/models/
 checkpoints/
 *.h5
 *.pkl

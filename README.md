@@ -100,6 +100,27 @@ python denoise_tiff.py input.tiff --method bilateral --bilateral-sigma-color 75
 python denoise_tiff.py input.tiff --preserve-range
 ```
 
+## 🖥️ GUI Application
+
+A standalone desktop application is available for easy batch processing without command-line usage.
+
+### Features
+- Process GPR, TIFF, and JPEG images
+- Batch processing with progress tracking
+- Dark/Light mode interface
+- Cross-platform (Windows, macOS, Linux)
+
+### Quick Start
+```bash
+# Run the GUI
+python app.py
+
+# Or build standalone executable
+python build_scripts/build_app.py
+```
+
+See [GUI_README.md](GUI_README.md) for detailed GUI documentation.
+
 ## 🏗️ Architecture
 
 ### Standard U-Net Model

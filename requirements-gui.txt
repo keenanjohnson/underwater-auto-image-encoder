@@ -1,0 +1,23 @@
+# GUI Application Requirements
+# Minimal dependencies for running the GUI application
+
+# Core ML dependencies (subset of main requirements.txt)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Image processing essentials
+Pillow>=10.0.0
+imageio>=2.31.0
+rawpy>=0.18.0  # For GPR/DNG processing
+numpy>=1.24.0
+
+# GUI framework
+customtkinter>=5.2.0
+
+# Utilities
+tqdm>=4.65.0
+PyYAML>=6.0
+
+# Optional but recommended for better image handling
+opencv-python>=4.8.0
+scikit-image>=0.21.0

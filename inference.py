@@ -247,20 +247,36 @@ class Inferencer:
         
         return tensor, (pad_h, pad_w)
     
-    def process_image_tiled(self, image_path: Path, tile_size=1024, overlap=128):
-        """Process large image using tiling to avoid memory issues"""
+    def process_image_tiled(self, image_path: Path, tile_size=1024, overlap=128, progress_callback=None):
+        """Process large image using tiling to avoid memory issues
+        
+        Args:
+            image_path: Path to input image
+            tile_size: Size of each tile
+            overlap: Overlap between tiles
+            progress_callback: Optional callback(message) for progress updates
+        """
         img = Image.open(image_path).convert('RGB')
         original_size = img.size
         width, height = original_size
         
         logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles")
+        if progress_callback:
+            progress_callback(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles")
         
         # Create output image
         output_img = Image.new('RGB', original_size)
         
+        # Calculate total tiles for progress tracking
+        tiles_x = (width + tile_size - overlap - 1) // (tile_size - overlap)
+        tiles_y = (height + tile_size - overlap - 1) // (tile_size - overlap)
+        total_tiles = tiles_x * tiles_y
+        current_tile = 0
+        
         # Process tiles
         for y in range(0, height, tile_size - overlap):
             for x in range(0, width, tile_size - overlap):
+                current_tile += 1
                 # Define tile boundaries
                 x_end = min(x + tile_size, width)
                 y_end = min(y + tile_size, height)
@@ -302,11 +318,19 @@ class Inferencer:
                     output_img.paste(enhanced_tile, (x, y))
                 
                 logger.info(f"Processed tile ({x}, {y}) to ({x_end}, {y_end})")
+                if progress_callback:
+                    progress_callback(f"Processed tile {current_tile}/{total_tiles} ({x}, {y}) to ({x_end}, {y_end})")
         
         return output_img
 
-    def process_image(self, image_path: Path, output_path: Path = None):
-        """Process a single image"""
+    def process_image(self, image_path: Path, output_path: Path = None, progress_callback=None):
+        """Process a single image
+        
+        Args:
+            image_path: Path to input image
+            output_path: Optional output path for saving
+            progress_callback: Optional callback(message) for progress updates
+        """
         img = Image.open(image_path).convert('RGB')
         original_size = img.size
         width, height = original_size
@@ -317,7 +341,7 @@ class Inferencer:
         # Use tiling for large images to avoid memory issues
         if not resize_inference and (width > 2048 or height > 2048):
             logger.info(f"Large image detected ({width}x{height}), using tiled processing")
-            output_img = self.process_image_tiled(image_path)
+            output_img = self.process_image_tiled(image_path, progress_callback=progress_callback)
         elif resize_inference:
             # Use training resolution
             input_tensor = self.transform(img).unsqueeze(0).to(self.device)
