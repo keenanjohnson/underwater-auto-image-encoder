@@ -2,6 +2,7 @@
 
 # Model Configuration
 model:
+  type: "UNetAutoencoder"  # Model architecture type
   n_channels: 3  # Input channels (RGB)
   n_classes: 3   # Output channels (RGB)
   # Standard U-Net with full feature progression: 64 → 128 → 256 → 512 → 1024

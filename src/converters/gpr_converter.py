@@ -33,7 +33,7 @@ class GPRConverter:
             binary_path = base_path / 'linux' / 'gpr_tools'
         
         if not binary_path.exists():
-            raise FileNotFoundError(f"gpr_tools binary not found at {binary_path}")
+            raise FileNotFoundError(f"gpr_tools binary not found at {binary_path}. GPR support requires the bundled gpr_tools binary.")
         
         # Ensure binary is executable on Unix systems
         if system != 'windows':
@@ -44,19 +44,24 @@ class GPRConverter:
     
     @classmethod
     def convert(cls, gpr_path: Path, output_path: Path = None, 
-                keep_temp: bool = False) -> Path:
+                keep_temp: bool = False, crop_to_size: tuple = (4606, 4030)) -> Path:
         """
-        Convert GPR file to TIFF
+        Convert GPR file to TIFF with optional center cropping
         
         Args:
             gpr_path: Path to input GPR file
             output_path: Optional output path (auto-generated if None)
             keep_temp: Keep temporary files for debugging
+            crop_to_size: Optional (width, height) tuple for center cropping. Default (4606, 4030) matches training data.
         
         Returns:
             Path to converted TIFF file
         """
-        gpr_tools = cls.get_gpr_tools_path()
+        try:
+            gpr_tools = cls.get_gpr_tools_path()
+        except FileNotFoundError as e:
+            logger.error(str(e))
+            raise
         
         # Create temp DNG file since gpr_tools outputs DNG
         with tempfile.NamedTemporaryFile(suffix='.dng', delete=False) as tmp:
@@ -86,12 +91,32 @@ class GPRConverter:
                 import imageio
                 
                 # Use rawpy to read DNG and convert to TIFF
+                # Match preprocess_images.py exactly: no_auto_bright=True
                 with rawpy.imread(str(dng_path)) as raw:
                     rgb = raw.postprocess(
                         use_camera_wb=True,
-                        no_auto_bright=False,
+                        no_auto_bright=True,  # Match preprocess_images.py - no auto brightness
                         output_bps=16
                     )
+                
+                # Apply center cropping if specified (matching preprocess_images.py)
+                if crop_to_size:
+                    crop_width, crop_height = crop_to_size
+                    height, width = rgb.shape[:2]
+                    
+                    if width >= crop_width and height >= crop_height:
+                        # Center crop
+                        center_x = width // 2
+                        center_y = height // 2
+                        left = center_x - crop_width // 2
+                        top = center_y - crop_height // 2
+                        right = left + crop_width
+                        bottom = top + crop_height
+                        
+                        rgb = rgb[top:bottom, left:right]
+                        logger.info(f"Center cropped image to {crop_width}x{crop_height}")
+                    else:
+                        logger.warning(f"Image ({width}x{height}) too small to crop to {crop_width}x{crop_height}, keeping original size")
                 
                 if output_path is None:
                     with tempfile.NamedTemporaryFile(suffix='.tiff', delete=False) as tmp:
@@ -108,6 +133,26 @@ class GPRConverter:
                 # Note: PIL may not handle DNG well, but let's try
                 try:
                     img = Image.open(dng_path)
+                    
+                    # Apply center cropping if specified
+                    if crop_to_size:
+                        crop_width, crop_height = crop_to_size
+                        width, height = img.size
+                        
+                        if width >= crop_width and height >= crop_height:
+                            # Center crop
+                            center_x = width // 2
+                            center_y = height // 2
+                            left = center_x - crop_width // 2
+                            top = center_y - crop_height // 2
+                            right = left + crop_width
+                            bottom = top + crop_height
+                            
+                            img = img.crop((left, top, right, bottom))
+                            logger.info(f"Center cropped image to {crop_width}x{crop_height}")
+                        else:
+                            logger.warning(f"Image ({width}x{height}) too small to crop to {crop_width}x{crop_height}, keeping original size")
+                    
                     if output_path is None:
                         with tempfile.NamedTemporaryFile(suffix='.tiff', delete=False) as tmp:
                             output_path = Path(tmp.name)
@@ -146,15 +191,25 @@ class GPRConverter:
         return file_path.suffix.lower() in ['.gpr']
     
     @classmethod
+    def is_available(cls) -> bool:
+        """Check if GPR conversion is available"""
+        try:
+            cls.get_gpr_tools_path()
+            return True
+        except FileNotFoundError:
+            return False
+    
+    @classmethod
     def batch_convert(cls, gpr_files: list[Path], output_dir: Path = None,
-                     progress_callback=None) -> list[Path]:
+                     progress_callback=None, crop_to_size: tuple = (4606, 4030)) -> list[Path]:
         """
-        Convert multiple GPR files to TIFF
+        Convert multiple GPR files to TIFF with optional cropping
         
         Args:
             gpr_files: List of GPR file paths
             output_dir: Directory for output files
             progress_callback: Optional callback(current, total, filename)
+            crop_to_size: Optional (width, height) tuple for center cropping. Default (4606, 4030) matches training data.
         
         Returns:
             List of converted TIFF paths
@@ -174,7 +229,7 @@ class GPRConverter:
                 output_path = None
             
             try:
-                tiff_path = cls.convert(gpr_path, output_path)
+                tiff_path = cls.convert(gpr_path, output_path, crop_to_size=crop_to_size)
                 converted_files.append(tiff_path)
             except Exception as e:
                 logger.error(f"Failed to convert {gpr_path}: {e}")

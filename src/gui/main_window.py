@@ -13,6 +13,12 @@ from typing import Optional
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
+# Import version from main app module
+try:
+    from app import __version__
+except ImportError:
+    __version__ = "dev"
+
 from src.gui.image_processor import ImageProcessor
 
 # Configure logging
@@ -33,7 +39,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
         super().__init__()
         
         # Window configuration
-        self.title("🌊 Underwater Image Enhancer")
+        self.title(f"🌊 Underwater Image Enhancer v{__version__}")
         self.geometry("980x850")  # Larger initial size to show all controls
         self.minsize(950, 800)    # Ensure minimum height shows buttons
         
@@ -347,11 +353,28 @@ class UnderwaterEnhancerApp(ctk.CTk):
         try:
             # Initialize processor
             model_path = self.model_path_var.get()
-            self.processor = ImageProcessor(model_path)
+            # Check if config.yaml exists in the same directory as the model
+            model_dir = Path(model_path).parent
+            config_path = model_dir / "config.yaml"
+            if not config_path.exists():
+                # Try in the project root
+                config_path = Path("config.yaml")
+                if not config_path.exists():
+                    config_path = None
+            
+            self.processor = ImageProcessor(model_path, str(config_path) if config_path else None)
+            
+            # Log GPR support status
+            if self.processor.gpr_support:
+                import platform
+                check = "[OK]" if platform.system() == "Windows" else "✓"
+                self.log(f"GPR support: Available {check}")
+            else:
+                self.log("GPR support: Not available (gpr_tools binary missing)")
             
             self.log("Loading model...")
             self.processor.load_model()
-            self.log("Model loaded successfully - Processing at full resolution")
+            self.log("Model loaded successfully - Full resolution processing enabled (with tiling for large images)")
             
             # Setup paths
             output_dir = Path(self.output_path_var.get())
@@ -363,9 +386,20 @@ class UnderwaterEnhancerApp(ctk.CTk):
             # Process batch
             self.log(f"Starting batch processing of {len(self.input_files)} images...")
             
-            # Warn about GPR processing time
+            # Check for GPR files and GPR support
             gpr_files = [f for f in self.input_files if f.suffix.lower() == '.gpr']
             if gpr_files:
+                # Check if GPR support is available
+                if not self.processor.gpr_support:
+                    error_msg = (
+                        f"Cannot process {len(gpr_files)} GPR file(s).\n\n"
+                        "GPR support is not available - the gpr_tools binary is missing.\n"
+                        "Please rebuild the application with GPR support enabled."
+                    )
+                    self.log(f"Error: {error_msg}")
+                    messagebox.showerror("GPR Support Missing", error_msg)
+                    return
+                
                 self.log(f"Note: Processing {len(gpr_files)} GPR files at 4606×4030 resolution")
                 self.log("This may take several minutes per image...")
             
@@ -444,6 +478,9 @@ class UnderwaterEnhancerApp(ctk.CTk):
             self.log(f"✓ {filename} processed")
         elif "Failed" in status:
             self.log(f"✗ {filename} failed: {status.replace('Failed: ', '')}")
+        elif "tile" in status.lower():
+            # Log tile processing updates
+            self.log(f"  • {filename}: {status.replace('Processing - ', '')}")
     
     def cancel_process(self):
         """Cancel ongoing processing"""
