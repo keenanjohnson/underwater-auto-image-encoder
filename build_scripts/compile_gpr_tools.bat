@@ -74,15 +74,15 @@ if not exist clean_expat.ps1 (
     echo     $content = Get-Content $FilePath -Raw >> clean_expat.ps1
     echo     if ^($content^) { >> clean_expat.ps1
     echo         # Remove all __attribute__ patterns comprehensively >> clean_expat.ps1
-    echo         $content = $content -replace '__attribute__\s*\(\s*\([^)]*\)\s*\)', '' >> clean_expat.ps1
-    echo         $content = $content -replace '__attribute__\s*\(\([^)]*\)\)', '' >> clean_expat.ps1  
-    echo         $content = $content -replace '__attribute__\([^)]*\)', '' >> clean_expat.ps1
+    echo         $content = $content -replace '__attribute__\\s*\\(\\s*\\([^)]*\\)\\s*\\)', '' >> clean_expat.ps1
+    echo         $content = $content -replace '__attribute__\\s*\\(\\([^)]*\\)\\)', '' >> clean_expat.ps1  
+    echo         $content = $content -replace '__attribute__\\([^)]*\\)', '' >> clean_expat.ps1
     echo         # Remove standalone fallthrough >> clean_expat.ps1
-    echo         $content = $content -replace 'fallthrough\s*;', '/* fallthrough */;' >> clean_expat.ps1
-    echo         $content = $content -replace '\s*fallthrough\s*$', ' /* fallthrough */' >> clean_expat.ps1
+    echo         $content = $content -replace 'fallthrough\\s*;', '/* fallthrough */;' >> clean_expat.ps1
+    echo         $content = $content -replace '\\s*fallthrough\\s*$', ' /* fallthrough */' >> clean_expat.ps1
     echo         # Clean up any remaining attribute artifacts >> clean_expat.ps1
-    echo         $content = $content -replace '\s*\(\s*\(\s*fallthrough\s*\)\s*\)\s*;', ' /* fallthrough */;' >> clean_expat.ps1
-    echo         $content = $content -replace '\(\s*fallthrough\s*\)', '/* fallthrough */' >> clean_expat.ps1
+    echo         $content = $content -replace '\\s*\\(\\s*\\(\\s*fallthrough\\s*\\)\\s*\\)\\s*;', ' /* fallthrough */;' >> clean_expat.ps1
+    echo         $content = $content -replace '\\(\\s*fallthrough\\s*\\)', '/* fallthrough */' >> clean_expat.ps1
     echo         # Write cleaned content >> clean_expat.ps1
     echo         [System.IO.File]::WriteAllText^($FilePath, $content^) >> clean_expat.ps1
     echo         Write-Host "Cleaned $FilePath successfully" >> clean_expat.ps1
