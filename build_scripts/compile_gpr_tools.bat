@@ -18,6 +18,29 @@ cd temp\gpr
 REM Update to latest
 git pull
 
+REM Apply MSVC compatibility patch for fallthrough macro
+echo Applying MSVC compatibility patch...
+if not exist "source\lib\expat_lib\xmltok.h.bak" (
+    REM Check if patch is already applied
+    findstr /C:"define fallthrough" source\lib\expat_lib\xmltok.h >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo Adding fallthrough macro definition for MSVC...
+        REM Create a temporary file with the fix
+        (
+            echo /* MSVC compatibility fix */
+            echo #ifdef _MSC_VER
+            echo #define fallthrough
+            echo #endif
+            echo.
+            type source\lib\expat_lib\xmltok.h
+        ) > source\lib\expat_lib\xmltok.h.new
+        move /y source\lib\expat_lib\xmltok.h source\lib\expat_lib\xmltok.h.bak
+        move /y source\lib\expat_lib\xmltok.h.new source\lib\expat_lib\xmltok.h
+    ) else (
+        echo Patch already applied
+    )
+)
+
 REM Clean and create build directory
 if exist build (
     echo Cleaning previous build...
@@ -32,10 +55,9 @@ echo Configuring with CMake...
 REM Check if running in CI
 if defined CI (
     echo Running in CI environment...
-    REM For MSVC, we need to define fallthrough as empty to fix compilation
-    REM Also disable some warnings
-    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS /Dfallthrough="
-    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
+    REM For MSVC, disable some warnings
+    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
+    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS /EHsc"
     
     REM Try Ninja first (faster)
     where ninja >nul 2>nul
@@ -64,8 +86,8 @@ if defined CI (
     )
 ) else (
     REM Try with MSVC compatibility flags for local builds
-    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS /Dfallthrough="
-    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
+    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
+    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS /EHsc"
     
     echo Trying Visual Studio generator with MSVC compatibility...
     cmake -G "Visual Studio 17 2022" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"

@@ -1,0 +1,13 @@
+--- a/source/lib/expat_lib/xmltok.h
++++ b/source/lib/expat_lib/xmltok.h
+@@ -1,5 +1,10 @@
+ /* Copyright (c) 1998, 1999 Thai Open Source Software Center Ltd
+    See the file COPYING for copying permission.
++*/
++
++/* MSVC compatibility - define fallthrough as empty */
++#ifdef _MSC_VER
++#define fallthrough
++#endif
+ 
+ #ifndef XmlTok_INCLUDED
