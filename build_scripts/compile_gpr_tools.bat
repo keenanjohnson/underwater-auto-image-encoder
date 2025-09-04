@@ -49,31 +49,43 @@ echo Patching files for MSVC compatibility...
 REM First patch xmltok_impl.c to remove __attribute__((fallthrough)) usage
 if not exist source\lib\expat_lib\xmltok_impl.c.bak (
     copy source\lib\expat_lib\xmltok_impl.c source\lib\expat_lib\xmltok_impl.c.bak
-    REM Replace __attribute__((fallthrough)); with /* fallthrough */
-    powershell -Command "(Get-Content 'source\lib\expat_lib\xmltok_impl.c.bak' -Raw) -replace '__attribute__\s*\(\s*\(\s*fallthrough\s*\)\s*\)\s*;', '/* fallthrough */;' | Set-Content 'source\lib\expat_lib\xmltok_impl.c'"
-    echo Patched xmltok_impl.c - removed __attribute__((fallthrough))
+    REM Replace __attribute__ fallthrough with comment
+    powershell -Command "$content = Get-Content 'source\lib\expat_lib\xmltok_impl.c.bak' -Raw; $content = $content -replace '__attribute__\s*\(\s*\(\s*fallthrough\s*\)\s*\)\s*;', '/* fallthrough */;'; Set-Content -Path 'source\lib\expat_lib\xmltok_impl.c' -Value $content"
+    echo Patched xmltok_impl.c - removed __attribute__ fallthrough
 )
 
 REM Patch xmltok.c to also handle attribute and remove any remaining fallthrough
 if not exist source\lib\expat_lib\xmltok.c.bak (
     copy source\lib\expat_lib\xmltok.c source\lib\expat_lib\xmltok.c.bak
-    REM Replace __attribute__((fallthrough)); and bare fallthrough;
-    powershell -Command "(Get-Content 'source\lib\expat_lib\xmltok.c.bak' -Raw) -replace '__attribute__\s*\(\s*\(\s*fallthrough\s*\)\s*\)\s*;', '/* fallthrough */;' -replace '(?<!/)fallthrough;', '/* fallthrough */;' | Set-Content 'source\lib\expat_lib\xmltok.c'"
+    REM Replace __attribute__ fallthrough and bare fallthrough
+    powershell -Command "$content = Get-Content 'source\lib\expat_lib\xmltok.c.bak' -Raw; $content = $content -replace '__attribute__\s*\(\s*\(\s*fallthrough\s*\)\s*\)\s*;', '/* fallthrough */;'; $content = $content -replace 'fallthrough;', '/* fallthrough */;'; Set-Content -Path 'source\lib\expat_lib\xmltok.c' -Value $content"
     echo Patched xmltok.c - removed fallthrough usage
 )
 
-REM Patch internal.h directly to handle __attribute__ macros
-if not exist source\lib\expat_lib\internal.h.bak (
-    copy source\lib\expat_lib\internal.h source\lib\expat_lib\internal.h.bak
-    powershell -Command "(Get-Content 'source\lib\expat_lib\internal.h.bak') -replace '#define FASTCALL __attribute__\(\(stdcall, regparm\(3\)\)\)', '#ifdef _MSC_VER`n#define FASTCALL __fastcall`n#else`n#define FASTCALL __attribute__((stdcall, regparm(3)))`n#endif' -replace '#define FASTCALL __attribute__\(\(regparm\(3\)\)\)', '#ifdef _MSC_VER`n#define FASTCALL __fastcall`n#else`n#define FASTCALL __attribute__((regparm(3)))`n#endif' -replace '#define PTRFASTCALL __attribute__\(\(regparm\(3\)\)\)', '#ifdef _MSC_VER`n#define PTRFASTCALL __fastcall`n#else`n#define PTRFASTCALL __attribute__((regparm(3)))`n#endif' -replace '#define FALL_THROUGH __attribute__ \(\(fallthrough\)\)', '#ifdef _MSC_VER`n#define FALL_THROUGH`n#else`n#define FALL_THROUGH __attribute__ ((fallthrough))`n#endif' | Set-Content 'source\lib\expat_lib\internal.h'"
-    echo Patched internal.h
-)
+REM Create a simpler compatibility header that we'll prepend to files
+echo Creating MSVC compatibility definitions...
+echo #ifdef _MSC_VER > msvc_compat.h
+echo #undef __attribute__ >> msvc_compat.h
+echo #define __attribute__(x) >> msvc_compat.h
+echo #undef FASTCALL >> msvc_compat.h
+echo #define FASTCALL __fastcall >> msvc_compat.h
+echo #undef PTRFASTCALL >> msvc_compat.h
+echo #define PTRFASTCALL __fastcall >> msvc_compat.h
+echo #undef XMLCALL >> msvc_compat.h
+echo #define XMLCALL __cdecl >> msvc_compat.h
+echo #undef FALL_THROUGH >> msvc_compat.h
+echo #define FALL_THROUGH >> msvc_compat.h
+echo #undef fallthrough >> msvc_compat.h
+echo #define fallthrough >> msvc_compat.h
+echo #endif >> msvc_compat.h
 
-REM Patch expat_external.h to handle XMLCALL
-if not exist source\lib\expat_lib\expat_external.h.bak (
-    copy source\lib\expat_lib\expat_external.h source\lib\expat_lib\expat_external.h.bak
-    powershell -Command "(Get-Content 'source\lib\expat_lib\expat_external.h.bak') -replace '#define XMLCALL __attribute__\(\(cdecl\)\)', '#ifdef _MSC_VER`n#define XMLCALL __cdecl`n#else`n#define XMLCALL __attribute__((cdecl))`n#endif' | Set-Content 'source\lib\expat_lib\expat_external.h'"
-    echo Patched expat_external.h
+REM Now prepend this header to the problematic files
+if not exist source\lib\expat_lib\xmltok.h.bak (
+    copy source\lib\expat_lib\xmltok.h source\lib\expat_lib\xmltok.h.bak
+    type msvc_compat.h > source\lib\expat_lib\xmltok.h.tmp
+    type source\lib\expat_lib\xmltok.h.bak >> source\lib\expat_lib\xmltok.h.tmp
+    move /y source\lib\expat_lib\xmltok.h.tmp source\lib\expat_lib\xmltok.h
+    echo Patched xmltok.h with MSVC compatibility
 )
 
 REM Clean and create build directory
