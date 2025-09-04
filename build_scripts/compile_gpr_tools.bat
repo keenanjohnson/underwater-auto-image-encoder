@@ -26,82 +26,115 @@ REM Check if we have the patch file and apply it
 if exist "..\..\msvc_compatibility.patch" (
     echo Applying existing MSVC compatibility patch...
     git apply "..\..\msvc_compatibility.patch" 2>nul || (
-        echo Git apply failed, applying patch manually...
-        goto :manual_patch
+        echo Git apply failed, applying comprehensive manual patches...
+        goto :comprehensive_patch
     )
     echo Patch applied successfully
     goto :cmake_patch
 ) else (
-    echo MSVC patch file not found, applying manual patches...
-    goto :manual_patch
+    echo MSVC patch file not found, applying comprehensive manual patches...
+    goto :comprehensive_patch
 )
 
-:manual_patch
-REM Apply comprehensive MSVC compatibility fixes
-echo Applying manual MSVC compatibility patches...
+:comprehensive_patch
+REM Apply comprehensive MSVC compatibility fixes by creating clean versions of problematic files
+echo Applying comprehensive MSVC compatibility patches...
 
-REM 1. Patch xmltok.h - add fallthrough definition at the top
+REM 1. Create a completely clean version of xmltok.h with MSVC compatibility
 if not exist source\lib\expat_lib\xmltok.h.bak (
     copy source\lib\expat_lib\xmltok.h source\lib\expat_lib\xmltok.h.bak
     
-    REM Create the patched header content
-    echo /* Copyright ^(c^) 1998, 1999 Thai Open Source Software Center Ltd > xmltok_new.h
-    echo    See the file COPYING for copying permission. >> xmltok_new.h
-    echo */ >> xmltok_new.h
-    echo. >> xmltok_new.h
-    echo /* MSVC compatibility - define GNU C extensions as empty */ >> xmltok_new.h
-    echo #ifdef _MSC_VER >> xmltok_new.h
-    echo #ifndef fallthrough >> xmltok_new.h
-    echo #define fallthrough >> xmltok_new.h
-    echo #endif >> xmltok_new.h
-    echo #ifndef __attribute__ >> xmltok_new.h
-    echo #define __attribute__^(x^) >> xmltok_new.h
-    echo #endif >> xmltok_new.h
-    echo #endif >> xmltok_new.h
-    echo. >> xmltok_new.h
+    REM Create a clean, MSVC-compatible xmltok.h
+    echo /* Copyright ^(c^) 1998, 1999 Thai Open Source Software Center Ltd > source\lib\expat_lib\xmltok.h
+    echo    See the file COPYING for copying permission. >> source\lib\expat_lib\xmltok.h
+    echo */ >> source\lib\expat_lib\xmltok.h
+    echo. >> source\lib\expat_lib\xmltok.h
+    echo /* MSVC compatibility defines */ >> source\lib\expat_lib\xmltok.h
+    echo #ifdef _MSC_VER >> source\lib\expat_lib\xmltok.h
+    echo #define fallthrough >> source\lib\expat_lib\xmltok.h
+    echo #define __attribute__^(x^) >> source\lib\expat_lib\xmltok.h
+    echo #define FASTCALL __fastcall >> source\lib\expat_lib\xmltok.h
+    echo #define PTRFASTCALL __fastcall >> source\lib\expat_lib\xmltok.h
+    echo #define XMLCALL __cdecl >> source\lib\expat_lib\xmltok.h
+    echo #endif >> source\lib\expat_lib\xmltok.h
+    echo. >> source\lib\expat_lib\xmltok.h
     
-    REM Skip the copyright lines from original and append the rest
-    more +3 source\lib\expat_lib\xmltok.h.bak >> xmltok_new.h
-    move /y xmltok_new.h source\lib\expat_lib\xmltok.h
-    echo Patched xmltok.h with MSVC compatibility
+    REM Extract and append the actual header content, skipping first 4 lines (copyright + blank)
+    powershell -Command "try { $lines = Get-Content 'source\lib\expat_lib\xmltok.h.bak'; $content = $lines[4..$($lines.Length-1)] -join \"`n\"; Add-Content -Path 'source\lib\expat_lib\xmltok.h' -Value $content } catch { Write-Host 'PowerShell header merge failed' }"
+    echo Recreated xmltok.h with MSVC compatibility
 )
 
-REM 2. Patch xmltok_impl.c to remove __attribute__ usage
+REM 2. Use a comprehensive sed-like replacement for the C files
+REM First, create a PowerShell script file for comprehensive cleaning
+if not exist clean_expat.ps1 (
+    echo # PowerShell script to clean expat files for MSVC compatibility > clean_expat.ps1
+    echo param^([string]$FilePath^) >> clean_expat.ps1
+    echo. >> clean_expat.ps1
+    echo try { >> clean_expat.ps1
+    echo     $content = Get-Content $FilePath -Raw >> clean_expat.ps1
+    echo     if ^($content^) { >> clean_expat.ps1
+    echo         # Remove all __attribute__ patterns comprehensively >> clean_expat.ps1
+    echo         $content = $content -replace '__attribute__\s*\(\s*\([^)]*\)\s*\)', '' >> clean_expat.ps1
+    echo         $content = $content -replace '__attribute__\s*\(\([^)]*\)\)', '' >> clean_expat.ps1  
+    echo         $content = $content -replace '__attribute__\([^)]*\)', '' >> clean_expat.ps1
+    echo         # Remove standalone fallthrough >> clean_expat.ps1
+    echo         $content = $content -replace 'fallthrough\s*;', '/* fallthrough */;' >> clean_expat.ps1
+    echo         $content = $content -replace '\s*fallthrough\s*$', ' /* fallthrough */' >> clean_expat.ps1
+    echo         # Clean up any remaining attribute artifacts >> clean_expat.ps1
+    echo         $content = $content -replace '\s*\(\s*\(\s*fallthrough\s*\)\s*\)\s*;', ' /* fallthrough */;' >> clean_expat.ps1
+    echo         $content = $content -replace '\(\s*fallthrough\s*\)', '/* fallthrough */' >> clean_expat.ps1
+    echo         # Write cleaned content >> clean_expat.ps1
+    echo         [System.IO.File]::WriteAllText^($FilePath, $content^) >> clean_expat.ps1
+    echo         Write-Host "Cleaned $FilePath successfully" >> clean_expat.ps1
+    echo     } >> clean_expat.ps1
+    echo } catch { >> clean_expat.ps1
+    echo     Write-Host "Error cleaning $FilePath`: $_" >> clean_expat.ps1
+    echo } >> clean_expat.ps1
+)
+
+REM 3. Apply comprehensive cleaning to the problematic files
 if not exist source\lib\expat_lib\xmltok_impl.c.bak (
     copy source\lib\expat_lib\xmltok_impl.c source\lib\expat_lib\xmltok_impl.c.bak
-    
-    REM Use more robust PowerShell replacement
-    powershell -Command "try { $content = Get-Content 'source\lib\expat_lib\xmltok_impl.c.bak' -Raw; if ($content) { $content = $content -replace '__attribute__\s*\(\s*\([^)]*\)\s*\)', ''; $content = $content -replace 'fallthrough\s*;', '/* fallthrough */;'; [System.IO.File]::WriteAllText('source\lib\expat_lib\xmltok_impl.c', $content) } } catch { Write-Host 'PowerShell patch failed' }"
-    echo Patched xmltok_impl.c
+    powershell -ExecutionPolicy Bypass -File clean_expat.ps1 -FilePath "source\lib\expat_lib\xmltok_impl.c"
+    echo Cleaned xmltok_impl.c
 )
 
-REM 3. Patch xmltok.c to remove __attribute__ usage  
 if not exist source\lib\expat_lib\xmltok.c.bak (
     copy source\lib\expat_lib\xmltok.c source\lib\expat_lib\xmltok.c.bak
-    
-    REM Use more robust PowerShell replacement
-    powershell -Command "try { $content = Get-Content 'source\lib\expat_lib\xmltok.c.bak' -Raw; if ($content) { $content = $content -replace '__attribute__\s*\(\s*\([^)]*\)\s*\)', ''; $content = $content -replace 'fallthrough\s*;', '/* fallthrough */;'; [System.IO.File]::WriteAllText('source\lib\expat_lib\xmltok.c', $content) } } catch { Write-Host 'PowerShell patch failed' }"
-    echo Patched xmltok.c
+    powershell -ExecutionPolicy Bypass -File clean_expat.ps1 -FilePath "source\lib\expat_lib\xmltok.c"
+    echo Cleaned xmltok.c
 )
 
+REM Clean up the temporary PowerShell script
+del clean_expat.ps1
+
 :cmake_patch
-REM 4. Patch CMakeLists.txt for MSVC compatibility
+REM 4. Patch CMakeLists.txt for MSVC compatibility with more comprehensive flags
 if not exist CMakeLists.txt.bak (
     copy CMakeLists.txt CMakeLists.txt.bak
     
-    REM Create MSVC-compatible CMakeLists.txt
-    echo # MSVC Compatibility Settings > cmake_msvc.txt
+    REM Create comprehensive MSVC-compatible CMakeLists.txt
+    echo # MSVC Compatibility Settings - Must be at top > cmake_msvc.txt
     echo if^(MSVC^) >> cmake_msvc.txt
-    echo     # Remove problematic C99 flag for MSVC >> cmake_msvc.txt
+    echo     # Remove problematic flags for MSVC >> cmake_msvc.txt
     echo     string^(REPLACE "-std=c99" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}"^) >> cmake_msvc.txt
-    echo     # Add MSVC-specific definitions >> cmake_msvc.txt
+    echo     string^(REPLACE "-std=c++11" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}"^) >> cmake_msvc.txt
+    echo     # Add comprehensive MSVC compatibility definitions >> cmake_msvc.txt
     echo     add_definitions^(-D_CRT_SECURE_NO_WARNINGS^) >> cmake_msvc.txt
     echo     add_definitions^(-Dfallthrough=^) >> cmake_msvc.txt
     echo     add_definitions^(-D__attribute__^(x^)=^) >> cmake_msvc.txt
-    echo     # Enable exception handling >> cmake_msvc.txt
+    echo     add_definitions^(-DFASTCALL=__fastcall^) >> cmake_msvc.txt
+    echo     add_definitions^(-DPTRFASTCALL=__fastcall^) >> cmake_msvc.txt
+    echo     add_definitions^(-DXMLCALL=__cdecl^) >> cmake_msvc.txt
+    echo     # Force exception handling for C++ >> cmake_msvc.txt
     echo     set^(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc"^) >> cmake_msvc.txt
+    echo     # Add additional MSVC-specific flags >> cmake_msvc.txt
+    echo     set^(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4068 /wd4244 /wd4996"^) >> cmake_msvc.txt
+    echo     set^(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068 /wd4244 /wd4996"^) >> cmake_msvc.txt
+    echo     message^(STATUS "Applied MSVC compatibility settings"^) >> cmake_msvc.txt
     echo else^(^) >> cmake_msvc.txt
     echo     set^(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99"^) >> cmake_msvc.txt
+    echo     set^(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11"^) >> cmake_msvc.txt
     echo endif^(^) >> cmake_msvc.txt
     echo. >> cmake_msvc.txt
     
