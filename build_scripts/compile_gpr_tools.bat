@@ -15,15 +15,15 @@ if not exist "temp\gpr" (
 
 cd temp\gpr
 
-REM Update to latest and reset any changes
+REM Update to latest and reset any changes  
 git reset --hard HEAD
 git pull
 
-REM Remove fallthrough statements that cause issues with MSVC
-echo Removing problematic fallthrough statements for MSVC compatibility...
-powershell -Command "(Get-Content source\lib\expat_lib\xmltok_impl.c) -replace 'fallthrough;', '/* fallthrough */;' | Set-Content source\lib\expat_lib\xmltok_impl.c"
-powershell -Command "(Get-Content source\lib\expat_lib\xmltok.c) -replace 'fallthrough;', '/* fallthrough */;' | Set-Content source\lib\expat_lib\xmltok.c"
-echo Patched source files for MSVC
+REM Define fallthrough macro for MSVC
+echo Defining fallthrough macro for MSVC compatibility...
+
+REM Add fallthrough definition to xmltok.h since it's included by the other files
+powershell -Command "$content = Get-Content 'source\lib\expat_lib\xmltok.h' -Raw; if($content -notmatch 'define fallthrough') { $newContent = '#ifdef _MSC_VER' + [Environment]::NewLine + '#ifndef fallthrough' + [Environment]::NewLine + '#define fallthrough ((void)0)' + [Environment]::NewLine + '#endif' + [Environment]::NewLine + '#endif' + [Environment]::NewLine + [Environment]::NewLine + $content; Set-Content 'source\lib\expat_lib\xmltok.h' -Value $newContent -NoNewline }"
 
 REM Clean and create build directory
 if exist build (
@@ -32,6 +32,7 @@ if exist build (
 )
 mkdir build
 cd build
+
 
 REM Try different build methods
 echo Configuring with CMake...
