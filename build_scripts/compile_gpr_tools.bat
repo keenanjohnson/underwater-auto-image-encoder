@@ -22,35 +22,45 @@ git pull
 REM Fix MSVC compatibility issues in GPR source
 echo Fixing MSVC compatibility issues...
 
-REM 1. Fix the CMakeLists.txt to not use -std=c99 with MSVC
+REM 1. Create a patch file for CMakeLists.txt
 echo Patching CMakeLists.txt for MSVC...
-powershell -Command "$content = Get-Content 'CMakeLists.txt' -Raw; $content = $content -replace 'set\(CMAKE_C_FLAGS .*-std=c99.*\)', 'if(NOT MSVC)`r`n    set(CMAKE_C_FLAGS \"`${CMAKE_C_FLAGS} -std=c99\"`)`r`nendif()'; Set-Content 'CMakeLists.txt' -Value $content -NoNewline"
+echo # MSVC Compatibility Patch > cmake_patch.txt
+echo if(MSVC) >> cmake_patch.txt
+echo     add_definitions(-Dfallthrough=) >> cmake_patch.txt
+echo     add_definitions(-D__attribute__^(x^)=) >> cmake_patch.txt
+echo else() >> cmake_patch.txt
+echo     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99") >> cmake_patch.txt
+echo endif() >> cmake_patch.txt
 
-REM 2. Define fallthrough and fix __attribute__ for MSVC in xmltok.h
-echo Adding MSVC compatibility macros to xmltok.h...
-powershell -Command "$header = @'
-#ifdef _MSC_VER
-#ifndef MSVC_COMPAT_DEFINED
-#define MSVC_COMPAT_DEFINED
-#define fallthrough ((void)0)
-#define __attribute__(x)
-#endif
-#endif
+REM Apply the patch by prepending to CMakeLists.txt
+if exist CMakeLists.txt.bak (
+    echo CMakeLists.txt already patched
+) else (
+    copy CMakeLists.txt CMakeLists.txt.bak
+    type cmake_patch.txt > CMakeLists.tmp
+    type CMakeLists.txt >> CMakeLists.tmp
+    move /y CMakeLists.tmp CMakeLists.txt
+    echo CMakeLists.txt patched
+)
 
-'@; $content = Get-Content 'source\lib\expat_lib\xmltok.h' -Raw; if($content -notmatch 'MSVC_COMPAT_DEFINED') { $newContent = $header + $content; Set-Content 'source\lib\expat_lib\xmltok.h' -Value $newContent -NoNewline }"
+REM 2. Create compatibility header
+echo Creating MSVC compatibility header...
+echo #ifdef _MSC_VER > msvc_compat.h
+echo #ifndef MSVC_COMPAT_DEFINED >> msvc_compat.h
+echo #define MSVC_COMPAT_DEFINED >> msvc_compat.h
+echo #define fallthrough ((void)0) >> msvc_compat.h
+echo #define __attribute__(x) >> msvc_compat.h
+echo #endif >> msvc_compat.h
+echo #endif >> msvc_compat.h
 
-REM 3. Also add the compatibility macros to xmltok_impl.c
-echo Adding MSVC compatibility macros to xmltok_impl.c...
-powershell -Command "$header = @'
-#ifdef _MSC_VER
-#ifndef MSVC_COMPAT_DEFINED
-#define MSVC_COMPAT_DEFINED
-#define fallthrough ((void)0)
-#define __attribute__(x)
-#endif
-#endif
-
-'@; $content = Get-Content 'source\lib\expat_lib\xmltok_impl.c' -Raw; if($content -notmatch 'MSVC_COMPAT_DEFINED') { $newContent = $header + $content; Set-Content 'source\lib\expat_lib\xmltok_impl.c' -Value $newContent -NoNewline }"
+REM 3. Prepend include to problematic files
+if not exist source\lib\expat_lib\xmltok.h.bak (
+    copy source\lib\expat_lib\xmltok.h source\lib\expat_lib\xmltok.h.bak
+    echo #include "../../msvc_compat.h" > source\lib\expat_lib\xmltok.h.tmp
+    type source\lib\expat_lib\xmltok.h.bak >> source\lib\expat_lib\xmltok.h.tmp
+    move /y source\lib\expat_lib\xmltok.h.tmp source\lib\expat_lib\xmltok.h
+    echo Patched xmltok.h
+)
 
 REM Clean and create build directory
 if exist build (
