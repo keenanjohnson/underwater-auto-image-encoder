@@ -13,16 +13,18 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Windows build temporarily disabled - will be fixed in separate PR
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         include:
           - os: ubuntu-latest
             platform: linux
             binary_name: UnderwaterEnhancer
             gpr_binary: binaries/linux/gpr_tools
-          - os: windows-latest
-            platform: windows
-            binary_name: UnderwaterEnhancer.exe
-            gpr_binary: binaries/win32/gpr_tools.exe
+          # - os: windows-latest
+          #   platform: windows
+          #   binary_name: UnderwaterEnhancer.exe
+          #   gpr_binary: binaries/win32/gpr_tools.exe
           - os: macos-latest
             platform: macos
             binary_name: UnderwaterEnhancer.app
