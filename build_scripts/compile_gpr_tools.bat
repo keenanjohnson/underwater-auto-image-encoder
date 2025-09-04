@@ -32,51 +32,58 @@ echo Configuring with CMake...
 REM Check if running in CI
 if defined CI (
     echo Running in CI environment...
+    REM For MSVC, we need to define fallthrough as empty to fix compilation
+    REM Also disable some warnings
+    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS /Dfallthrough="
+    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
+    
     REM Try Ninja first (faster)
     where ninja >nul 2>nul
     if %errorlevel% equ 0 (
-        echo Using Ninja generator...
-        cmake -G "Ninja" .. -DCMAKE_BUILD_TYPE=Release
+        echo Using Ninja generator with MSVC compatibility flags...
+        cmake -G "Ninja" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"
         if %errorlevel% equ 0 (
             ninja gpr_tools
         ) else (
-            echo Ninja configuration failed, trying default generator...
+            echo Ninja configuration failed, trying Visual Studio generator...
             cd ..
             rmdir /s /q build
             mkdir build
             cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Release
+            cmake -G "Visual Studio 17 2022" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"
             if %errorlevel% equ 0 (
                 cmake --build . --config Release --target gpr_tools
             )
         )
     ) else (
-        echo Ninja not found, using default generator...
-        cmake .. -DCMAKE_BUILD_TYPE=Release
+        echo Ninja not found, using Visual Studio generator...
+        cmake -G "Visual Studio 17 2022" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"
         if %errorlevel% equ 0 (
             cmake --build . --config Release --target gpr_tools
         )
     )
 ) else (
-    REM Try default generator for local builds
-    cmake .. -DCMAKE_BUILD_TYPE=Release
+    REM Try with MSVC compatibility flags for local builds
+    set "CMAKE_C_FLAGS=/D_CRT_SECURE_NO_WARNINGS /Dfallthrough="
+    set "CMAKE_CXX_FLAGS=/D_CRT_SECURE_NO_WARNINGS"
+    
+    echo Trying Visual Studio generator with MSVC compatibility...
+    cmake -G "Visual Studio 17 2022" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"
     if %errorlevel% neq 0 (
-        echo Default CMake configuration failed. Trying Ninja...
-        cd ..
-        rmdir /s /q build
-        mkdir build
-        cd build
-        cmake -G "Ninja" .. -DCMAKE_BUILD_TYPE=Release
+        echo VS2022 not found, trying VS2019...
+        cmake -G "Visual Studio 16 2019" .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"
         if %errorlevel% neq 0 (
-            echo CMake configuration failed. Please ensure build tools are installed.
-            exit /b 1
+            echo Visual Studio not found. Trying default generator...
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="%CMAKE_C_FLAGS%" -DCMAKE_CXX_FLAGS="%CMAKE_CXX_FLAGS%"
+            if %errorlevel% neq 0 (
+                echo CMake configuration failed. Please ensure Visual Studio or Build Tools are installed.
+                exit /b 1
+            )
         )
-        ninja
-    ) else (
-        REM Build with default generator
-        echo Building with default generator...
-        cmake --build . --config Release
     )
+    REM Build with configured generator
+    echo Building gpr_tools...
+    cmake --build . --config Release --target gpr_tools
 )
 
 REM Copy binary - try different possible locations
