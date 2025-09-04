@@ -168,37 +168,63 @@ jobs:
       if: matrix.os != 'windows-latest'
       run: |
         if [ ! -f "${{ matrix.gpr_binary }}" ]; then
-          echo "Compiling GPR tools..."
+          echo "Compiling GPR tools from source..."
           chmod +x build_scripts/compile_gpr_tools.sh
-          ./build_scripts/compile_gpr_tools.sh || echo "GPR compilation failed - continuing without GPR support"
+          ./build_scripts/compile_gpr_tools.sh
+          if [ $? -ne 0 ]; then
+            echo "FATAL: GPR tools compilation failed"
+            exit 1
+          fi
         else
           echo "Using cached GPR tools binary"
         fi
-        # Verify binary exists
-        if [ -f "${{ matrix.gpr_binary }}" ]; then
-          echo "GPR tools binary available at: ${{ matrix.gpr_binary }}"
-          ls -la "${{ matrix.gpr_binary }}"
-        else
-          echo "Warning: GPR tools binary not available - GPR support will be disabled"
+        
+        # Verify binary exists and is valid
+        if [ ! -f "${{ matrix.gpr_binary }}" ]; then
+          echo "FATAL: GPR tools binary not found at expected location: ${{ matrix.gpr_binary }}"
+          exit 1
         fi
+        
+        # Check file size to ensure it's not a placeholder
+        SIZE=$(stat -f%z "${{ matrix.gpr_binary }}" 2>/dev/null || stat -c%s "${{ matrix.gpr_binary }}")
+        if [ "$SIZE" -lt 10000 ]; then
+          echo "FATAL: GPR tools binary is too small ($SIZE bytes) - likely corrupted or placeholder"
+          exit 1
+        fi
+        
+        echo "SUCCESS: GPR tools binary found and validated"
+        ls -la "${{ matrix.gpr_binary }}"
 
     - name: Compile GPR tools (Windows)
       if: matrix.os == 'windows-latest'
       shell: cmd
       run: |
         if not exist "${{ matrix.gpr_binary }}" (
-          echo Compiling GPR tools...
-          build_scripts\compile_gpr_tools.bat || echo GPR compilation failed - continuing without GPR support
+          echo Compiling GPR tools from source...
+          build_scripts\compile_gpr_tools.bat
+          if %ERRORLEVEL% neq 0 (
+            echo FATAL: GPR tools compilation failed with exit code %ERRORLEVEL%
+            exit /b 1
+          )
         ) else (
           echo Using cached GPR tools binary
         )
-        if exist "${{ matrix.gpr_binary }}" (
-          echo GPR tools binary available at: ${{ matrix.gpr_binary }}
-          dir "${{ matrix.gpr_binary }}"
-        ) else (
-          echo Warning: GPR tools binary not available - GPR support will be disabled
+        
+        REM Verify the binary exists and is valid
+        if not exist "${{ matrix.gpr_binary }}" (
+          echo FATAL: GPR tools binary not found at expected location: ${{ matrix.gpr_binary }}
+          exit /b 1
         )
-      continue-on-error: true
+        
+        REM Check file size to ensure it's not a placeholder
+        for %%I in ("${{ matrix.gpr_binary }}") do set SIZE=%%~zI
+        if %SIZE% LSS 10000 (
+          echo FATAL: GPR tools binary is too small (%SIZE% bytes) - likely corrupted or placeholder
+          exit /b 1
+        )
+        
+        echo SUCCESS: GPR tools binary found and validated
+        dir "${{ matrix.gpr_binary }}"
 
     - name: Create placeholder icons
       run: |

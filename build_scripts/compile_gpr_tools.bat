@@ -31,13 +31,32 @@ echo Configuring with CMake...
 
 REM Check if running in CI
 if defined CI (
-    echo Running in CI, using Ninja...
-    cmake -G "Ninja" .. -DCMAKE_BUILD_TYPE=Release
-    if %errorlevel% neq 0 (
-        echo Ninja configuration failed.
-        exit /b 1
+    echo Running in CI environment...
+    REM Try Ninja first (faster)
+    where ninja >nul 2>nul
+    if %errorlevel% equ 0 (
+        echo Using Ninja generator...
+        cmake -G "Ninja" .. -DCMAKE_BUILD_TYPE=Release
+        if %errorlevel% equ 0 (
+            ninja gpr_tools
+        ) else (
+            echo Ninja configuration failed, trying default generator...
+            cd ..
+            rmdir /s /q build
+            mkdir build
+            cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release
+            if %errorlevel% equ 0 (
+                cmake --build . --config Release --target gpr_tools
+            )
+        )
+    ) else (
+        echo Ninja not found, using default generator...
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        if %errorlevel% equ 0 (
+            cmake --build . --config Release --target gpr_tools
+        )
     )
-    ninja
 ) else (
     REM Try default generator for local builds
     cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -63,25 +82,32 @@ if defined CI (
 REM Copy binary - try different possible locations
 if not exist "..\..\..\binaries\win32" mkdir "..\..\..\binaries\win32"
 
-REM Try Release build location
-if exist "source\app\gpr_tools\Release\gpr_tools.exe" (
-    copy "source\app\gpr_tools\Release\gpr_tools.exe" "..\..\..\binaries\win32\gpr_tools.exe"
-    goto :check_copy
+REM Search for gpr_tools.exe in all possible locations
+echo Searching for gpr_tools.exe...
+
+REM Common build output locations
+set LOCATIONS=source\app\gpr_tools\Release\gpr_tools.exe source\app\gpr_tools\gpr_tools.exe Release\gpr_tools.exe gpr_tools.exe bin\gpr_tools.exe bin\Release\gpr_tools.exe
+
+for %%L in (%LOCATIONS%) do (
+    if exist "%%L" (
+        echo Found gpr_tools.exe at: %%L
+        copy "%%L" "..\..\..\binaries\win32\gpr_tools.exe"
+        goto :check_copy
+    )
 )
 
-REM Try Ninja build location
-if exist "source\app\gpr_tools\gpr_tools.exe" (
-    copy "source\app\gpr_tools\gpr_tools.exe" "..\..\..\binaries\win32\gpr_tools.exe"
-    goto :check_copy
+REM If still not found, search recursively
+echo Searching recursively for gpr_tools.exe...
+for /r . %%i in (gpr_tools.exe) do (
+    if exist "%%i" (
+        echo Found gpr_tools.exe at: %%i
+        copy "%%i" "..\..\..\binaries\win32\gpr_tools.exe"
+        goto :check_copy
+    )
 )
 
-REM Try root build location (Ninja sometimes puts it here)
-if exist "gpr_tools.exe" (
-    copy "gpr_tools.exe" "..\..\..\binaries\win32\gpr_tools.exe"
-    goto :check_copy
-)
-
-echo Warning: Could not find gpr_tools.exe in expected locations
+echo ERROR: Could not find gpr_tools.exe in any location
+dir /s /b *.exe
 exit /b 1
 
 :check_copy

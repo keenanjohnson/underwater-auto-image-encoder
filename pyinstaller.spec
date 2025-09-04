@@ -21,15 +21,34 @@ elif system == 'darwin':
 else:
     gpr_binary = ('binaries/linux/gpr_tools', 'binaries/linux')
 
-# Check if binary exists, if not, create placeholder
+# Check if binary exists - REQUIRED for packaging
 binary_path = Path(gpr_binary[0])
 if not binary_path.exists():
-    print(f"Warning: {binary_path} not found. Creating placeholder.")
-    binary_path.parent.mkdir(parents=True, exist_ok=True)
-    # For now, we'll include the binary only if it exists
-    binaries = []
-else:
-    binaries = [gpr_binary]
+    print(f"\n" + "="*60)
+    print(f"FATAL ERROR: GPR tools binary not found!")
+    print(f"Expected location: {binary_path}")
+    print(f"\nThe gpr_tools binary MUST be compiled before packaging.")
+    print(f"Please run the appropriate build script:")
+    if system == 'windows':
+        print(f"  build_scripts\\compile_gpr_tools.bat")
+    else:
+        print(f"  ./build_scripts/compile_gpr_tools.sh")
+    print("="*60 + "\n")
+    raise FileNotFoundError(f"Required gpr_tools binary not found at {binary_path}")
+
+# Verify it's a valid executable (not a placeholder)
+file_size = binary_path.stat().st_size
+if file_size < 10000:  # Less than 10KB is definitely wrong
+    print(f"\n" + "="*60)
+    print(f"FATAL ERROR: GPR tools binary appears invalid!")
+    print(f"Binary path: {binary_path}")
+    print(f"File size: {file_size} bytes (expected > 10KB)")
+    print(f"The file may be corrupted or a placeholder.")
+    print("="*60 + "\n")
+    raise ValueError(f"Invalid gpr_tools binary at {binary_path} (size: {file_size} bytes)")
+
+print(f"✓ Found valid GPR tools binary: {binary_path} (size: {file_size:,} bytes)")
+binaries = [gpr_binary]
 
 # Manually list all src modules since collect_submodules doesn't work in CI
 src_modules = [
