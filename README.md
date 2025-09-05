@@ -258,7 +258,7 @@ The trained model should reproduce manual Lightroom adjustments:
 
 ## 📚 References
 
-- [GoPro GPR Tools](https://github.com/gopro/gpr)
+- [GoPro GPR Tools](https://github.com/keenanjohnson/gpr_tools) (fork with MSVC fixes)
 - [U-Net Paper](https://arxiv.org/abs/1505.04597)
 - [Underwater Enhancement Research](https://github.com/Seattle-Aquarium/CCR_development/issues/29)
 

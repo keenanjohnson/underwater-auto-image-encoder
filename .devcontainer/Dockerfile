@@ -16,11 +16,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && rm -rf /var/lib/apt/lists/*
 
 
-# Install GoPro GPR tools with byte order fix
-RUN git clone https://github.com/gopro/gpr.git /tmp/gpr \
+# Install GoPro GPR tools (using fork with MSVC and byte order fixes)
+RUN git clone https://github.com/keenanjohnson/gpr_tools.git /tmp/gpr \
     && cd /tmp/gpr \
     && mkdir build && cd build \
-    && cmake .. -DCMAKE_CXX_FLAGS="-DqDNGBigEndian=0" \
+    && cmake .. \
     && make -j$(nproc) \
     && cp source/app/gpr_tools/gpr_tools /usr/local/bin/ \
     && chmod +x /usr/local/bin/gpr_tools \

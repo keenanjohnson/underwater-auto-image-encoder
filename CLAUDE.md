@@ -127,7 +127,7 @@ Key settings:
 - Loss weights: L1=0.8, MSE=0.2
 
 ## External Dependencies
-- **GPR Tools**: Install via `./install_gpr_tools.sh` or build from https://github.com/gopro/gpr
+- **GPR Tools**: Install via `./build_scripts/compile_gpr_tools.sh` or build from https://github.com/keenanjohnson/gpr_tools (fork with MSVC fixes)
 - **Python 3.8+** with PyTorch, OpenCV, scikit-image
 - **CUDA GPU** recommended (auto-fallback to CPU)
 

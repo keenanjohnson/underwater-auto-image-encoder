@@ -2,7 +2,7 @@
 
 ## Background
 We equip our ROV with two downward-facing GoPro HERO12 cameras to take 27.3MP survey images of the seafloor ([see custom settings here](https://www.dropbox.com/scl/fi/fiv13iwlppctow3ocjppy/settings_GoProLabs.JPG?rlkey=76fbpjrr68iau1sbsm6czf334&st=4fuixxwq&dl=0)), with the aim to photograph algae, invertebrates, fishes, and the underlying substrate.
-The cameras capture RAW images (GoPro's General Purpose RAW, i.e., .GPR file; info [linked here](https://github.com/gopro/gpr)) at 3-second intervals, leaving us with hundreds if not thousands of unedited GPR images (the GoPro also captures a JPEG preview of each GPR photo, though these are not edited, as the GPR enables a much greater degree of post-processing).
+The cameras capture RAW images (GoPro's General Purpose RAW, i.e., .GPR file; info [linked here](https://github.com/keenanjohnson/gpr_tools)) at 3-second intervals, leaving us with hundreds if not thousands of unedited GPR images (the GoPro also captures a JPEG preview of each GPR photo, though these are not edited, as the GPR enables a much greater degree of post-processing).
 While we batch edit these images in Adobe Lightroom Classic, each image often requires individual tuning before any meaningful data can be extracted from it with subsequent programs.
 This individual editing is our workflow's most rate-limiting step. 
 

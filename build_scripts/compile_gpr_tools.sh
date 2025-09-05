@@ -10,7 +10,7 @@ if [ ! -d "temp/gpr" ]; then
     echo "Cloning GPR repository..."
     mkdir -p temp
     cd temp
-    git clone https://github.com/gopro/gpr.git
+    git clone https://github.com/keenanjohnson/gpr_tools.git gpr
     cd ..
 fi
 
