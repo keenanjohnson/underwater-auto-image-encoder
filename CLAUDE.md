@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT: Git Commit Policy
+**NEVER automatically add or commit changes.** Only stage and commit files when explicitly requested by the user. This applies to all situations - no exceptions.
+
 ## Project Overview
 
 Underwater image enhancement ML pipeline that automates manual GoPro RAW editing for Seattle Aquarium ROV surveys. Replaces time-intensive manual Adobe Lightroom editing with trained U-Net autoencoder.
