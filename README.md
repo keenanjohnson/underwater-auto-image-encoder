@@ -2,7 +2,56 @@
 
 An automated machine learning pipeline that replaces manual image editing for underwater GoPro images captured during ROV surveys. The system converts RAW GPR files to enhanced JPEGs that match manual Adobe Lightroom editing quality.
 
-## 🚀 Quick Start
+![Underwater Image Enhancer GUI](gui_screenshot.png)
+
+## 🖥️ Desktop Application (GUI)
+
+**For most users: A user-friendly desktop application is available that requires no programming knowledge.**
+
+### Download and Run
+```bash
+# Windows
+Download UnderwaterEnhancer.exe from releases
+
+# macOS  
+Download UnderwaterEnhancer.app from releases
+
+# Linux
+Download UnderwaterEnhancer from releases
+```
+
+### GUI Features
+- **Drag & Drop Interface** - Simply drag images into the application
+- **Batch Processing** - Process hundreds of images at once
+- **Real-time Preview** - See enhanced results instantly
+- **Multiple Format Support** - GPR, JPEG, PNG, TIFF input formats
+- **Progress Tracking** - Visual progress bars for batch operations
+- **Dark/Light Themes** - Comfortable viewing in any environment
+- **No Installation Required** - Standalone executable, just download and run
+
+### Running from Source
+```bash
+# Install dependencies (first time only)
+pip install -r requirements.txt
+
+# Run the GUI application
+python app.py
+```
+
+### Building the Executable
+```bash
+# Build standalone executable for your platform
+python build_scripts/build_app.py
+
+# Find the executable in:
+# Windows: dist/UnderwaterEnhancer.exe
+# macOS:   dist/UnderwaterEnhancer.app
+# Linux:   dist/UnderwaterEnhancer
+```
+
+For detailed GUI documentation, see [GUI_README.md](GUI_README.md).
+
+## 🚀 Quick Start (Command Line)
 
 ### Prerequisites
 - Python 3.8+
@@ -100,26 +149,6 @@ python denoise_tiff.py input.tiff --method bilateral --bilateral-sigma-color 75
 python denoise_tiff.py input.tiff --preserve-range
 ```
 
-## 🖥️ GUI Application
-
-A standalone desktop application is available for easy batch processing without command-line usage.
-
-### Features
-- Process GPR, TIFF, and JPEG images
-- Batch processing with progress tracking
-- Dark/Light mode interface
-- Cross-platform (Windows, macOS, Linux)
-
-### Quick Start
-```bash
-# Run the GUI
-python app.py
-
-# Or build standalone executable
-python build_scripts/build_app.py
-```
-
-See [GUI_README.md](GUI_README.md) for detailed GUI documentation.
 
 ## 🏗️ Architecture
 
