@@ -9,6 +9,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write  # Required for creating/updating releases
+
 jobs:
   build:
     strategy:
