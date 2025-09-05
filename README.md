@@ -20,6 +20,15 @@ Download UnderwaterEnhancer.app from releases
 Download UnderwaterEnhancer from releases
 ```
 
+### GUI Models
+
+You can use models trained from this repo to process images.
+
+For example, two different models are provided in this google drive folder:
+https://drive.google.com/drive/u/0/folders/1Vdctr52LTxoS6eecFiGS5LROZYSqJ3vl
+
+Models are in the .pth format and can be loaded into the GUI.
+
 #### Windows Security Warning
 When running the Windows executable for the first time, you may see a security warning from Windows Defender SmartScreen. This occurs because the application is not digitally signed. To run the application:
 
