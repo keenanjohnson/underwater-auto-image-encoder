@@ -20,6 +20,14 @@ Download UnderwaterEnhancer.app from releases
 Download UnderwaterEnhancer from releases
 ```
 
+#### Windows Security Warning
+When running the Windows executable for the first time, you may see a security warning from Windows Defender SmartScreen. This occurs because the application is not digitally signed. To run the application:
+
+1. Click **"More info"** on the Windows Defender SmartScreen warning
+2. Click **"Run anyway"** at the bottom of the dialog
+
+The application is safe to use. This warning appears for all unsigned executables and will decrease over time as more users run the application.
+
 ### GUI Features
 - **Drag & Drop Interface** - Simply drag images into the application
 - **Batch Processing** - Process hundreds of images at once
