@@ -47,7 +47,7 @@ if [[ "$OS" == "macos" ]]; then
     echo "   brew install cmake"
     echo
     echo "2. Clone and build:"
-    echo "   git clone https://github.com/gopro/gpr.git"
+    echo "   git clone https://github.com/keenanjohnson/gpr_tools.git gpr"
     echo "   cd gpr"
     echo "   mkdir build && cd build"
     echo "   cmake .."
@@ -70,7 +70,7 @@ elif [[ "$OS" == "linux" ]]; then
         exit 1
     fi
     
-    git clone https://github.com/gopro/gpr.git
+    git clone https://github.com/keenanjohnson/gpr_tools.git gpr
     cd gpr
     mkdir build && cd build
     cmake ..
@@ -90,6 +90,6 @@ rm -rf "$TEMP_DIR"
 
 echo
 echo "For Docker containers, add this to your Dockerfile:"
-echo "RUN git clone https://github.com/gopro/gpr.git && \\"
+echo "RUN git clone https://github.com/keenanjohnson/gpr_tools.git gpr && \\"
 echo "    cd gpr && mkdir build && cd build && \\"
 echo "    cmake .. && make && make install"

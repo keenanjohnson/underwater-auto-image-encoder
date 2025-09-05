@@ -443,7 +443,7 @@ echo "Compiling gpr_tools for $(uname -s)..."
 if [ ! -d "temp/gpr" ]; then
     mkdir -p temp
     cd temp
-    git clone https://github.com/gopro/gpr.git
+    git clone https://github.com/keenanjohnson/gpr_tools.git gpr
     cd ..
 fi
 
