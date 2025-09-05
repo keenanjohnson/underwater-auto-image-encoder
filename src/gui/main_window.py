@@ -40,8 +40,8 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # Window configuration
         self.title(f"🌊 Underwater Image Enhancer v{__version__}")
-        self.geometry("980x850")  # Larger initial size to show all controls
-        self.minsize(950, 800)    # Ensure minimum height shows buttons
+        self.geometry("980x680")  # Reduced height for laptop screens
+        self.minsize(950, 650)    # Reduced minimum height
         
         # Processing state
         self.processing = False
@@ -63,7 +63,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
         self.update_idletasks()
         # Use the configured size
         width = 980
-        height = 850
+        height = 680
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
@@ -73,7 +73,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # Main container with padding
         main_container = ctk.CTkFrame(self)
-        main_container.pack(fill="both", expand=True, padx=15, pady=10)
+        main_container.pack(fill="both", expand=True, padx=10, pady=5)
         
         # Title
         title_label = ctk.CTkLabel(
@@ -81,16 +81,16 @@ class UnderwaterEnhancerApp(ctk.CTk):
             text="Underwater Image Enhancer",
             font=ctk.CTkFont(size=24, weight="bold")
         )
-        title_label.pack(pady=(0, 15))
+        title_label.pack(pady=(0, 8))
         
         # Model Selection Frame
         model_frame = ctk.CTkFrame(main_container)
-        model_frame.pack(fill="x", pady=(0, 10))
+        model_frame.pack(fill="x", pady=(0, 8))
         
-        ctk.CTkLabel(model_frame, text="Model Selection", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(10, 5))
+        ctk.CTkLabel(model_frame, text="Model Selection", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(5, 3))
         
         model_path_frame = ctk.CTkFrame(model_frame)
-        model_path_frame.pack(fill="x", padx=10, pady=(0, 10))
+        model_path_frame.pack(fill="x", padx=10, pady=(0, 5))
         
         self.model_path_var = ctk.StringVar(value="")
         self.model_entry = ctk.CTkEntry(
@@ -99,7 +99,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
             placeholder_text="Select model file (.pth)",
             width=500
         )
-        self.model_entry.pack(side="left", padx=(10, 10), pady=10)
+        self.model_entry.pack(side="left", padx=(10, 10), pady=5)
         
         self.model_browse_btn = ctk.CTkButton(
             model_path_frame, 
@@ -107,13 +107,13 @@ class UnderwaterEnhancerApp(ctk.CTk):
             command=self.browse_model,
             width=100
         )
-        self.model_browse_btn.pack(side="left", padx=(0, 10), pady=10)
+        self.model_browse_btn.pack(side="left", padx=(0, 10), pady=5)
         
         # Input/Output Frame
         io_frame = ctk.CTkFrame(main_container)
-        io_frame.pack(fill="x", pady=(0, 10))
+        io_frame.pack(fill="x", pady=(0, 8))
         
-        ctk.CTkLabel(io_frame, text="Input/Output Folders", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(8, 5))
+        ctk.CTkLabel(io_frame, text="Input/Output Folders", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(5, 3))
         
         # Input folder
         input_frame = ctk.CTkFrame(io_frame)
@@ -140,7 +140,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # Output folder
         output_frame = ctk.CTkFrame(io_frame)
-        output_frame.pack(fill="x", padx=10, pady=(0, 10))
+        output_frame.pack(fill="x", padx=10, pady=(0, 5))
         
         ctk.CTkLabel(output_frame, text="Output:", width=60).pack(side="left", padx=(10, 5))
         
@@ -163,7 +163,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # File info and format selection
         info_frame = ctk.CTkFrame(main_container)
-        info_frame.pack(fill="x", pady=(0, 10))
+        info_frame.pack(fill="x", pady=(0, 8))
         
         self.files_label = ctk.CTkLabel(info_frame, text="Files Found: 0 images")
         self.files_label.pack(side="left", padx=15)
@@ -179,9 +179,9 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # Progress Frame
         progress_frame = ctk.CTkFrame(main_container)
-        progress_frame.pack(fill="x", pady=(0, 10))
+        progress_frame.pack(fill="x", pady=(0, 8))
         
-        ctk.CTkLabel(progress_frame, text="Progress", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(8, 5))
+        ctk.CTkLabel(progress_frame, text="Progress", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", padx=10, pady=(5, 3))
         
         self.progress_text = ctk.CTkLabel(progress_frame, text="Ready to process")
         self.progress_text.pack(anchor="w", padx=20, pady=(0, 5))
@@ -191,14 +191,14 @@ class UnderwaterEnhancerApp(ctk.CTk):
         self.progress_bar.set(0)
         
         self.time_label = ctk.CTkLabel(progress_frame, text="")
-        self.time_label.pack(anchor="w", padx=20, pady=(0, 10))
+        self.time_label.pack(anchor="w", padx=20, pady=(0, 5))
         
         # Log Frame
         log_frame = ctk.CTkFrame(main_container)
-        log_frame.pack(fill="both", expand=True, pady=(0, 10))
+        log_frame.pack(fill="both", expand=True, pady=(0, 8))
         
         log_header = ctk.CTkFrame(log_frame)
-        log_header.pack(fill="x", padx=10, pady=(8, 5))
+        log_header.pack(fill="x", padx=10, pady=(5, 3))
         
         ctk.CTkLabel(log_header, text="Log", font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
         
@@ -211,19 +211,19 @@ class UnderwaterEnhancerApp(ctk.CTk):
         )
         self.clear_log_btn.pack(side="right")
         
-        self.log_text = ctk.CTkTextbox(log_frame, height=180, width=840)
-        self.log_text.pack(padx=10, pady=(0, 10))
+        self.log_text = ctk.CTkTextbox(log_frame, height=120, width=840)
+        self.log_text.pack(padx=10, pady=(0, 5))
         
         # Control Buttons Frame
         control_frame = ctk.CTkFrame(main_container)
-        control_frame.pack(fill="x", pady=(5, 0))
+        control_frame.pack(fill="x", pady=(3, 0))
         
         self.process_btn = ctk.CTkButton(
             control_frame,
             text="▶ Start Processing",
             command=self.start_processing,
             width=150,
-            height=40,
+            height=35,
             font=ctk.CTkFont(size=14, weight="bold")
         )
         self.process_btn.pack(side="left", padx=(20, 10))
@@ -233,7 +233,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
             text="■ Cancel",
             command=self.cancel_process,
             width=100,
-            height=40,
+            height=35,
             state="disabled"
         )
         self.cancel_btn.pack(side="left", padx=5)
@@ -244,7 +244,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
             text="🌙 Dark Mode",
             command=self.toggle_theme,
             width=120,
-            height=40
+            height=35
         )
         self.theme_btn.pack(side="right", padx=(10, 20))
         
