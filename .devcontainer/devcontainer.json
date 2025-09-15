@@ -35,5 +35,9 @@
   "remoteUser": "vscode",
   "containerEnv": {
     "PYTHONPATH": "/workspace"
-  }
+  },
+  "runArgs": [
+    "--gpus",
+    "all"
+  ]
 }
