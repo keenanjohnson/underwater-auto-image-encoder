@@ -30,15 +30,15 @@ class GPRConverter:
         elif system == 'darwin':
             binary_path = base_path / 'darwin' / 'gpr_tools'
         else:  # linux
-            binary_path = base_path / 'linux' / 'gpr_tools'
+            binary_path = Path('/usr/local/bin/gpr_tools')
         
         if not binary_path.exists():
             raise FileNotFoundError(f"gpr_tools binary not found at {binary_path}. GPR support requires the bundled gpr_tools binary.")
         
         # Ensure binary is executable on Unix systems
-        if system != 'windows':
-            import stat
-            binary_path.chmod(binary_path.stat().st_mode | stat.S_IEXEC)
+        # if system != 'windows':
+        #     import stat
+        #     binary_path.chmod(binary_path.stat().st_mode | stat.S_IEXEC)
         
         return binary_path
     
