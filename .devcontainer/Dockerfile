@@ -27,6 +27,11 @@ RUN git clone https://github.com/keenanjohnson/gpr_tools.git /tmp/gpr \
     && rm -rf /tmp/gpr \
     && which gpr_tools && (gpr_tools -h 2>&1 | head -5 || echo "gpr_tools installed")
 
+# Install Python packages
+COPY ../requirements.txt /tmp/requirements.txt
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r /tmp/requirements.txt
+
 # Create workspace directory
 WORKDIR /workspace
 
