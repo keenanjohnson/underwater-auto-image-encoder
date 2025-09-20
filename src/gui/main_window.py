@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox
 import threading
 from pathlib import Path
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import sys
 from typing import Optional
 
@@ -302,7 +302,6 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # Count by type
         gpr_count = len([f for f in self.input_files if f.suffix.lower() == '.gpr'])
-        other_count = len(self.input_files) - gpr_count
         
         # Update display
         total = len(self.input_files)
@@ -387,8 +386,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
             
             self.log("Loading model...")
             self.processor.load_model()
-            # Get device info from processor
-            device_info = "GPU" if self.processor.is_gpu_available() else "CPU"
+            # Check if GPU is being used
             if self.processor.is_gpu_available():
                 self.log(f"Model loaded successfully on GPU - Full resolution processing enabled")
             else:

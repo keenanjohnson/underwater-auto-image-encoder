@@ -175,6 +175,7 @@ a = Analysis(
     datas=[
         ('config.yaml', '.') if Path('config.yaml').exists() else ('config.yaml', '.'),
         ('check_gpu.py', '.') if Path('check_gpu.py').exists() else ('check_gpu.py', '.'),
+        ('torch_bundle_fix.py', '.') if Path('torch_bundle_fix.py').exists() else ('torch_bundle_fix.py', '.'),
     ] + src_files,  # Include all Python files from src
     hiddenimports=[
         'customtkinter',

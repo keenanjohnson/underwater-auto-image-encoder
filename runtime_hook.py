@@ -4,6 +4,17 @@ Runtime hook to ensure src modules can be imported and torch paths are set corre
 import sys
 import os
 
+# Apply torch fixes for bundled applications
+if hasattr(sys, '_MEIPASS'):
+    # We're in a PyInstaller bundle, apply torch patches
+    sys.path.insert(0, sys._MEIPASS)
+    try:
+        import torch_bundle_fix
+    except ImportError:
+        # Fallback: just set environment variables
+        os.environ['TORCH_DISABLE_SOURCE_INSPECTION'] = '1'
+        os.environ['PYTORCH_DISABLE_LIBRARY_VALIDATION'] = '1'
+
 # Get the directory where the executable is located
 if hasattr(sys, '_MEIPASS'):
     # Running in PyInstaller bundle
