@@ -79,8 +79,8 @@ for root, dirs, files in os.walk('src'):
         if file.endswith('.py'):
             src_files.append((os.path.join(root, file), root))
 
-# Collect CUDA/PyTorch DLLs for GPU support on Windows
-cuda_binaries = []
+# Collect PyTorch binaries for each platform
+torch_binaries = []
 if system == 'windows':
     try:
         # Collect PyTorch CUDA DLLs
@@ -106,7 +106,7 @@ if system == 'windows':
             for pattern in cuda_dll_patterns:
                 dlls = list(lib_path.glob(pattern))
                 for dll in dlls:
-                    cuda_binaries.append((str(dll), 'torch/lib'))
+                    torch_binaries.append((str(dll), 'torch/lib'))
                     print(f"✓ Found CUDA DLL: {dll.name}")
 
         # Also check torch/bin for additional DLLs
@@ -115,11 +115,11 @@ if system == 'windows':
             for pattern in cuda_dll_patterns:
                 dlls = list(bin_path.glob(pattern))
                 for dll in dlls:
-                    cuda_binaries.append((str(dll), 'torch/bin'))
+                    torch_binaries.append((str(dll), 'torch/bin'))
                     print(f"✓ Found CUDA DLL: {dll.name}")
 
-        if cuda_binaries:
-            print(f"✓ Found {len(cuda_binaries)} CUDA DLLs for bundling")
+        if torch_binaries:
+            print(f"✓ Found {len(torch_binaries)} CUDA DLLs for bundling")
         else:
             print("⚠ No CUDA DLLs found - GPU support may not work")
 
@@ -128,8 +128,43 @@ if system == 'windows':
     except Exception as e:
         print(f"⚠ Error collecting CUDA DLLs: {e}")
 
-# Combine with GPR binary and CUDA binaries
-all_binaries = binaries + cuda_binaries
+elif system == 'darwin':
+    # macOS: Collect torch_shm_manager and other torch binaries
+    try:
+        import torch
+        torch_path = Path(torch.__file__).parent
+
+        # Critical binaries needed by PyTorch on macOS
+        torch_bin_path = torch_path / 'bin'
+        if torch_bin_path.exists():
+            # torch_shm_manager is required for multiprocessing
+            shm_manager = torch_bin_path / 'torch_shm_manager'
+            if shm_manager.exists():
+                torch_binaries.append((str(shm_manager), 'torch/bin'))
+                print(f"✓ Found torch_shm_manager for macOS")
+            else:
+                print("⚠ torch_shm_manager not found - this may cause issues")
+
+            # Include any other binaries in torch/bin
+            for binary in torch_bin_path.iterdir():
+                if binary.is_file() and binary.stat().st_mode & 0o111:  # Is executable
+                    torch_binaries.append((str(binary), 'torch/bin'))
+                    print(f"✓ Found torch binary: {binary.name}")
+
+        # Also collect .dylib files from torch/lib
+        torch_lib_path = torch_path / 'lib'
+        if torch_lib_path.exists():
+            for dylib in torch_lib_path.glob('*.dylib'):
+                torch_binaries.append((str(dylib), 'torch/lib'))
+                print(f"✓ Found torch library: {dylib.name}")
+
+    except ImportError:
+        print("⚠ PyTorch not found - cannot bundle torch binaries for macOS")
+    except Exception as e:
+        print(f"⚠ Error collecting torch binaries: {e}")
+
+# Combine with GPR binary and torch binaries
+all_binaries = binaries + torch_binaries
 
 # Silently collect files (debug output removed)
 

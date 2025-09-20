@@ -1,9 +1,8 @@
 """
-Runtime hook to ensure src modules can be imported
+Runtime hook to ensure src modules can be imported and torch paths are set correctly
 """
 import sys
 import os
-from pathlib import Path
 
 # Get the directory where the executable is located
 if hasattr(sys, '_MEIPASS'):
@@ -38,3 +37,18 @@ else:
 # Also add the base path
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
+
+# Fix torch paths for macOS app bundles
+if sys.platform == 'darwin' and hasattr(sys, '_MEIPASS'):
+    # Set environment variable for torch_shm_manager
+    torch_bin = os.path.join(base_path, 'torch', 'bin')
+    if os.path.exists(torch_bin):
+        # Add torch/bin to PATH so torch can find torch_shm_manager
+        current_path = os.environ.get('PATH', '')
+        if torch_bin not in current_path:
+            os.environ['PATH'] = f"{torch_bin}:{current_path}"
+
+        # Also set TORCH_SHIM_MANAGER explicitly if needed
+        shm_manager = os.path.join(torch_bin, 'torch_shm_manager')
+        if os.path.exists(shm_manager):
+            os.environ['TORCH_SHM_MANAGER'] = shm_manager

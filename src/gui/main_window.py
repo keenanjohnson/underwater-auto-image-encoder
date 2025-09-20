@@ -21,11 +21,8 @@ except ImportError:
 
 from src.gui.image_processor import ImageProcessor
 
-# Import torch to check GPU status
-try:
-    import torch
-except ImportError:
-    torch = None
+# Defer torch import to avoid issues during smoke tests
+torch = None
 
 # Configure logging
 logging.basicConfig(
@@ -544,10 +541,15 @@ class UnderwaterEnhancerApp(ctk.CTk):
 
     def get_gpu_status(self) -> str:
         """Get GPU/acceleration status text"""
+        global torch
         if torch is None:
-            return "⚠️ PyTorch not available"
+            try:
+                import torch as _torch
+                torch = _torch
+            except (ImportError, RuntimeError):
+                return "⚠️ PyTorch not available"
 
-        if torch.cuda.is_available():
+        if torch and torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
             return f"✓ GPU DETECTED: {gpu_name} ({gpu_memory:.1f}GB)"

@@ -1,16 +1,33 @@
 """
-PyInstaller hook for PyTorch to ensure CUDA DLLs are bundled on Windows
+PyInstaller hook for PyTorch to ensure required binaries are bundled
 Place this file in the same directory as pyinstaller.spec
 """
 
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_submodules
 import platform
+import os
+from pathlib import Path
 
 # Collect PyTorch dynamic libraries
 binaries = collect_dynamic_libs('torch')
 
-# On Windows, explicitly collect CUDA DLLs
-if platform.system() == 'Windows':
+# Platform-specific binary collection
+if platform.system() == 'Darwin':
+    # macOS: Ensure torch_shm_manager is included
+    try:
+        import torch
+        torch_path = Path(torch.__file__).parent
+        torch_bin = torch_path / 'bin' / 'torch_shm_manager'
+        if torch_bin.exists():
+            binaries.append((str(torch_bin), 'torch/bin'))
+    except:
+        pass
+
+    # Collect all torch submodules
+    hiddenimports = collect_submodules('torch')
+    datas = collect_data_files('torch', include_py_files=False)
+
+elif platform.system() == 'Windows':
     # Additional patterns for CUDA DLLs that might be missed
     datas = collect_data_files('torch', include_py_files=False)
 
@@ -26,5 +43,6 @@ if platform.system() == 'Windows':
         'torch.utils.cuda',
     ]
 else:
-    datas = []
-    hiddenimports = []
+    # Linux
+    hiddenimports = collect_submodules('torch')
+    datas = collect_data_files('torch', include_py_files=False)
