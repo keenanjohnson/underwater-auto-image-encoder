@@ -87,6 +87,9 @@ if system == 'windows':
         import torch
         torch_path = Path(torch.__file__).parent
 
+        # Check if this is a CUDA-enabled PyTorch build
+        is_cuda_build = torch.cuda.is_available() or (torch_path / 'lib' / 'cudart64_110.dll').exists()
+
         # Find CUDA DLLs in torch/lib directory
         cuda_dll_patterns = [
             'cudnn*.dll',
@@ -119,9 +122,12 @@ if system == 'windows':
                     print(f"✓ Found CUDA DLL: {dll.name}")
 
         if torch_binaries:
-            print(f"✓ Found {len(torch_binaries)} CUDA DLLs for bundling")
+            print(f"✓ Found {len(torch_binaries)} CUDA DLLs for bundling - GPU support included")
+        elif is_cuda_build:
+            print("⚠ No CUDA DLLs found but CUDA PyTorch detected - GPU support may not work")
         else:
-            print("⚠ No CUDA DLLs found - GPU support may not work")
+            print("ℹ CPU-only PyTorch detected - building without GPU support")
+            print("  Note: This is expected for macOS/Linux CI builds")
 
     except ImportError:
         print("⚠ PyTorch not found - cannot bundle CUDA DLLs")
