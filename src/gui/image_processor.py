@@ -41,12 +41,20 @@ class ImageProcessor:
         if not self.inferencer:
             # Create inferencer exactly like inference.py
             self.inferencer = Inferencer(self.model_path, self.config_path)
-            
+
             # Override config for full-size processing exactly like inference.py --full-size
             config_override = {'inference': {'resize_inference': False}}
             self.inferencer.config.update(config_override)
             self.inferencer.setup_transforms()  # Refresh transforms with new config
             logger.info(f"Model loaded from {self.model_path} - Full resolution processing enabled")
+
+    def is_gpu_available(self) -> bool:
+        """Check if GPU is available for inference"""
+        if self.inferencer:
+            return str(self.inferencer.device) != 'cpu'
+        else:
+            import torch
+            return torch.cuda.is_available()
     
     def process_image(self, input_path: Path, output_path: Path, 
                      output_format: str = 'TIFF', progress_callback=None) -> Path:

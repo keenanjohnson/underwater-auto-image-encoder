@@ -21,6 +21,12 @@ except ImportError:
 
 from src.gui.image_processor import ImageProcessor
 
+# Import torch to check GPU status
+try:
+    import torch
+except ImportError:
+    torch = None
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -77,11 +83,21 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # Title
         title_label = ctk.CTkLabel(
-            main_container, 
+            main_container,
             text="Underwater Image Enhancer",
             font=ctk.CTkFont(size=24, weight="bold")
         )
-        title_label.pack(pady=(0, 8))
+        title_label.pack(pady=(0, 2))
+
+        # GPU Status
+        gpu_status_text = self.get_gpu_status()
+        self.gpu_status_label = ctk.CTkLabel(
+            main_container,
+            text=gpu_status_text,
+            font=ctk.CTkFont(size=12),
+            text_color="green" if "GPU" in gpu_status_text and "DETECTED" in gpu_status_text else "orange"
+        )
+        self.gpu_status_label.pack(pady=(0, 8))
         
         # Model Selection Frame
         model_frame = ctk.CTkFrame(main_container)
@@ -374,7 +390,13 @@ class UnderwaterEnhancerApp(ctk.CTk):
             
             self.log("Loading model...")
             self.processor.load_model()
-            self.log("Model loaded successfully - Full resolution processing enabled (with tiling for large images)")
+            # Get device info from processor
+            device_info = "GPU" if self.processor.is_gpu_available() else "CPU"
+            if self.processor.is_gpu_available():
+                self.log(f"Model loaded successfully on GPU - Full resolution processing enabled")
+            else:
+                self.log(f"Model loaded successfully on CPU - Full resolution processing enabled (slower performance)")
+                self.log("Note: GPU not detected. For faster processing, ensure CUDA is available.")
             
             # Setup paths
             output_dir = Path(self.output_path_var.get())
@@ -519,3 +541,17 @@ class UnderwaterEnhancerApp(ctk.CTk):
         else:
             ctk.set_appearance_mode("dark")
             self.theme_btn.configure(text="☀️ Light Mode")
+
+    def get_gpu_status(self) -> str:
+        """Get GPU/acceleration status text"""
+        if torch is None:
+            return "⚠️ PyTorch not available"
+
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            return f"✓ GPU DETECTED: {gpu_name} ({gpu_memory:.1f}GB)"
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            return "✓ Apple Silicon MPS acceleration available"
+        else:
+            return "⚠️ CPU mode (no GPU detected)"

@@ -127,10 +127,32 @@ class Inferencer:
             # Handle Colab checkpoint format - create default config
             self.config = self._create_default_config(checkpoint)
         
-        self.device = torch.device(
-            'cuda' if torch.cuda.is_available() else 'cpu'
-        )
-        logger.info(f"Using device: {self.device}")
+        # Enhanced GPU detection with detailed logging
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # GB
+            logger.info(f"GPU DETECTED: {gpu_name} with {gpu_memory:.1f}GB memory")
+            logger.info(f"CUDA version: {torch.version.cuda}")
+            logger.info(f"PyTorch CUDA available: True")
+            logger.info(f"Using device: {self.device} (GPU acceleration enabled)")
+        else:
+            self.device = torch.device('cpu')
+            logger.warning("GPU NOT DETECTED - Running on CPU (slower performance)")
+            logger.info(f"PyTorch CUDA available: False")
+            logger.info(f"PyTorch version: {torch.__version__}")
+            # Try to diagnose why CUDA is not available
+            try:
+                import platform
+                logger.info(f"System: {platform.system()} {platform.machine()}")
+                if platform.system() == 'Windows':
+                    logger.info("Note: For GPU support on Windows, ensure:")
+                    logger.info("  1. NVIDIA GPU drivers are installed")
+                    logger.info("  2. CUDA runtime is available")
+                    logger.info("  3. PyTorch with CUDA support is bundled")
+            except:
+                pass
+            logger.info(f"Using device: {self.device} (CPU mode)")
         
         self.setup_model()
         

@@ -4,7 +4,7 @@ import platform
 import sys
 import os
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 # Ensure src is importable
 spec_dir = os.path.dirname(os.path.abspath(SPECPATH))
@@ -79,18 +79,74 @@ for root, dirs, files in os.walk('src'):
         if file.endswith('.py'):
             src_files.append((os.path.join(root, file), root))
 
+# Collect CUDA/PyTorch DLLs for GPU support on Windows
+cuda_binaries = []
+if system == 'windows':
+    try:
+        # Collect PyTorch CUDA DLLs
+        import torch
+        torch_path = Path(torch.__file__).parent
+
+        # Find CUDA DLLs in torch/lib directory
+        cuda_dll_patterns = [
+            'cudnn*.dll',
+            'cublas*.dll',
+            'cufft*.dll',
+            'curand*.dll',
+            'cusparse*.dll',
+            'cudart*.dll',
+            'nvrtc*.dll',
+            'c10_cuda.dll',
+            'torch_cuda*.dll',
+            'caffe2_nvrtc.dll'
+        ]
+
+        lib_path = torch_path / 'lib'
+        if lib_path.exists():
+            for pattern in cuda_dll_patterns:
+                dlls = list(lib_path.glob(pattern))
+                for dll in dlls:
+                    cuda_binaries.append((str(dll), 'torch/lib'))
+                    print(f"✓ Found CUDA DLL: {dll.name}")
+
+        # Also check torch/bin for additional DLLs
+        bin_path = torch_path / 'bin'
+        if bin_path.exists():
+            for pattern in cuda_dll_patterns:
+                dlls = list(bin_path.glob(pattern))
+                for dll in dlls:
+                    cuda_binaries.append((str(dll), 'torch/bin'))
+                    print(f"✓ Found CUDA DLL: {dll.name}")
+
+        if cuda_binaries:
+            print(f"✓ Found {len(cuda_binaries)} CUDA DLLs for bundling")
+        else:
+            print("⚠ No CUDA DLLs found - GPU support may not work")
+
+    except ImportError:
+        print("⚠ PyTorch not found - cannot bundle CUDA DLLs")
+    except Exception as e:
+        print(f"⚠ Error collecting CUDA DLLs: {e}")
+
+# Combine with GPR binary and CUDA binaries
+all_binaries = binaries + cuda_binaries
+
 # Silently collect files (debug output removed)
 
 a = Analysis(
     ['app.py'],
     pathex=[str(Path.cwd())],  # Add absolute path to current directory
-    binaries=binaries,
+    binaries=all_binaries,
     datas=[
         ('config.yaml', '.') if Path('config.yaml').exists() else ('config.yaml', '.'),
+        ('check_gpu.py', '.') if Path('check_gpu.py').exists() else ('check_gpu.py', '.'),
     ] + src_files,  # Include all Python files from src
     hiddenimports=[
         'customtkinter',
         'torch',
+        'torch.cuda',
+        'torch._C',
+        'torch._C._cuda',
         'torchvision',
         'PIL',
         'PIL.Image',

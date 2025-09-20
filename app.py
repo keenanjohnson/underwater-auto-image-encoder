@@ -17,14 +17,19 @@ def smoke_test():
     """Run smoke tests for CI validation"""
     print(f"Underwater Enhancer v{__version__}")
     print("Running smoke tests...")
-    
-    
+
     errors = []
     
     # Test critical imports
     try:
         import torch
         print("  [OK] PyTorch imported")
+        # Check GPU availability
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            print(f"  [OK] GPU detected: {gpu_name}")
+        else:
+            print("  [INFO] GPU not detected, will use CPU")
     except ImportError as e:
         errors.append(f"PyTorch import failed: {e}")
         print(f"  [FAIL] PyTorch: {e}")
@@ -77,11 +82,21 @@ def smoke_test():
         print("\nSmoke test PASSED - all modules imported successfully!")
         sys.exit(0)
 
+def check_gpu_cmd():
+    """Run GPU check from command line"""
+    from check_gpu import check_gpu
+    return check_gpu()
+
 def main():
     """Main application entry point"""
     # Check for smoke test mode
     if os.environ.get('SMOKE_TEST') == '1' or '--smoke-test' in sys.argv:
         smoke_test()
+        return
+
+    # Check for GPU check mode
+    if '--check-gpu' in sys.argv:
+        check_gpu_cmd()
         return
     
     from src.gui.main_window import UnderwaterEnhancerApp
