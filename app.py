@@ -9,9 +9,71 @@ __version__ = "0.1.0"
 import sys
 import os
 from pathlib import Path
+import logging
+import traceback
+from datetime import datetime
 
 # Add source directory to path
 sys.path.insert(0, str(Path(__file__).parent))
+
+def setup_logging():
+    """Setup file logging for crash diagnosis"""
+    # Determine log directory based on platform
+    if sys.platform == 'win32':
+        log_dir = Path(os.environ.get('APPDATA', '.')) / 'UnderwaterEnhancer' / 'logs'
+    elif sys.platform == 'darwin':
+        log_dir = Path.home() / 'Library' / 'Logs' / 'UnderwaterEnhancer'
+    else:
+        log_dir = Path.home() / '.local' / 'share' / 'UnderwaterEnhancer' / 'logs'
+
+    # Create log directory if it doesn't exist
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create log filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = log_dir / f'underwater_enhancer_{timestamp}.log'
+
+    # Configure root logger
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+    # Log startup information
+    logger = logging.getLogger(__name__)
+    logger.info(f"Underwater Enhancer v{__version__} starting")
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Platform: {sys.platform}")
+    logger.info(f"Log file: {log_file}")
+
+    # Set up global exception handler to catch unhandled exceptions
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+
+        logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+        # Write crash report
+        crash_file = log_dir / f'crash_{timestamp}.txt'
+        with open(crash_file, 'w') as f:
+            f.write(f"Underwater Enhancer Crash Report\n")
+            f.write(f"Version: {__version__}\n")
+            f.write(f"Time: {datetime.now().isoformat()}\n")
+            f.write(f"Python: {sys.version}\n")
+            f.write(f"Platform: {sys.platform}\n\n")
+            f.write("Exception:\n")
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+
+        logger.info(f"Crash report saved to: {crash_file}")
+
+    sys.excepthook = handle_exception
+
+    return log_file
 
 def smoke_test():
     """Run smoke tests for CI validation"""
@@ -84,22 +146,37 @@ def main():
         smoke_test()
         return
 
-    # Log system information for debugging GPU issues
-    import torch
-    print(f"Underwater Enhancer v{__version__}")
-    print(f"PyTorch Version: {torch.__version__}")
-    print(f"CUDA Available: {torch.cuda.is_available()}")
-    if torch.cuda.is_available():
-        print(f"CUDA Version: {torch.version.cuda}")
-        print(f"GPU Device: {torch.cuda.get_device_name(0)}")
-        print(f"GPU Count: {torch.cuda.device_count()}")
-    else:
-        print("Running in CPU mode")
-    print("-" * 40)
+    # Set up logging first
+    log_file = setup_logging()
+    logger = logging.getLogger(__name__)
 
-    from src.gui.main_window import UnderwaterEnhancerApp
-    app = UnderwaterEnhancerApp()
-    app.mainloop()
+    try:
+        # Log system information for debugging GPU issues
+        import torch
+        logger.info(f"Underwater Enhancer v{__version__}")
+        logger.info(f"PyTorch Version: {torch.__version__}")
+        logger.info(f"CUDA Available: {torch.cuda.is_available()}")
+        if torch.cuda.is_available():
+            logger.info(f"CUDA Version: {torch.version.cuda}")
+            logger.info(f"GPU Device: {torch.cuda.get_device_name(0)}")
+            logger.info(f"GPU Count: {torch.cuda.device_count()}")
+        else:
+            logger.info("Running in CPU mode")
+
+        # Print log location for user
+        print(f"Log file: {log_file}")
+        print("-" * 40)
+
+        from src.gui.main_window import UnderwaterEnhancerApp
+        logger.info("Creating main application window")
+        app = UnderwaterEnhancerApp()
+        logger.info("Starting main event loop")
+        app.mainloop()
+        logger.info("Application exited normally")
+
+    except Exception as e:
+        logger.exception("Fatal error in main()")
+        raise
 
 if __name__ == "__main__":
     main()
