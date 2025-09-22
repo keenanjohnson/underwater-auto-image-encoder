@@ -41,12 +41,16 @@ class ImageProcessor:
         if not self.inferencer:
             # Create inferencer exactly like inference.py
             self.inferencer = Inferencer(self.model_path, self.config_path)
-            
+
             # Override config for full-size processing exactly like inference.py --full-size
             config_override = {'inference': {'resize_inference': False}}
             self.inferencer.config.update(config_override)
             self.inferencer.setup_transforms()  # Refresh transforms with new config
-            logger.info(f"Model loaded from {self.model_path} - Full resolution processing enabled")
+
+            # Log device information clearly
+            import torch
+            device_type = "GPU (CUDA)" if torch.cuda.is_available() else "CPU"
+            logger.info(f"Model loaded from {self.model_path} - Using {device_type} - Full resolution processing enabled")
     
     def process_image(self, input_path: Path, output_path: Path, 
                      output_format: str = 'TIFF', progress_callback=None) -> Path:
@@ -178,11 +182,25 @@ class ImageProcessor:
         
         return results
     
+    def get_device_info(self) -> tuple[str, bool]:
+        """
+        Get information about the device being used for processing
+
+        Returns:
+            Tuple of (device_name, is_gpu)
+        """
+        import torch
+        if torch.cuda.is_available():
+            device_name = torch.cuda.get_device_name(0) if torch.cuda.device_count() > 0 else "CUDA GPU"
+            return (device_name, True)
+        else:
+            return ("CPU", False)
+
     @staticmethod
     def get_supported_formats() -> list[str]:
         """Get list of supported input formats"""
         return ['.gpr', '.tiff', '.tif', '.jpg', '.jpeg', '.png']
-    
+
     @staticmethod
     def filter_supported_files(files: list[Path]) -> list[Path]:
         """Filter list of files to only supported formats"""
