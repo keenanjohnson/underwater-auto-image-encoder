@@ -2,7 +2,7 @@ name: Build GUI Application
 
 on:
   push:
-    branches: [ main, basic-gui ]
+    branches: [ main ]
     tags:
       - 'v*'
   pull_request:
@@ -47,8 +47,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements_gui.txt') }}
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('requirements_gui.txt') }}
         restore-keys: |
+          ${{ runner.os }}-pip-universal-
           ${{ runner.os }}-pip-
 
     - name: Install system dependencies (Ubuntu)
@@ -128,8 +129,7 @@ jobs:
         rawpy>=0.18.0
         imageio>=2.31.0
         
-        # ML Dependencies
-        torch>=2.0.0
+        # ML Dependencies (torch installed separately)
         torchvision>=0.15.0
         numpy>=1.24.0
         
@@ -144,12 +144,30 @@ jobs:
                 f.write(requirements)
         "
 
-    - name: Install Python dependencies
+    - name: Install Python dependencies (Universal GPU/CPU Build)
       run: |
         python -m pip install --upgrade pip
-        # Install CPU-only PyTorch for smaller builds in CI
-        pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+        # Install PyTorch based on platform
+        if [ "${{ matrix.os }}" == "macos-latest" ]; then
+          echo "Installing PyTorch for macOS (includes MPS support)..."
+          pip install torch torchvision
+        elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+          echo "Installing PyTorch with CUDA support for Windows..."
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+        else
+          echo "Installing PyTorch with CUDA support for Linux..."
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+        fi
+
+        # Install other dependencies
         pip install -r requirements_gui.txt
+
+        # Verify PyTorch installation
+        python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
+        python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+        python -c "import torch; print(f'MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, \"mps\") else False}')"
+      shell: bash
 
     - name: Compile GPR tools (Linux/macOS)
       if: matrix.os != 'windows-latest'
@@ -243,7 +261,10 @@ jobs:
     
     - name: Build with PyInstaller
       run: |
+        echo "Building universal GPU/CPU executable..."
         pyinstaller pyinstaller.spec --clean --noconfirm
+        echo "Built universal GPU/CPU executable"
+      shell: bash
     
     - name: Fix macOS App Permissions
       if: matrix.os == 'macos-latest'
@@ -269,6 +290,38 @@ jobs:
                 print(f'{subindent}{file}')
         "
 
+    - name: Check executable size
+      run: |
+        python -c "
+        import os
+        import platform
+
+        if platform.system() == 'Darwin':
+            # macOS app bundle
+            app_path = 'dist/UnderwaterEnhancer.app'
+            total_size = sum(
+                os.path.getsize(os.path.join(dirpath, filename))
+                for dirpath, dirnames, filenames in os.walk(app_path)
+                for filename in filenames
+            )
+        elif platform.system() == 'Windows':
+            total_size = os.path.getsize('dist/UnderwaterEnhancer.exe')
+        else:
+            total_size = os.path.getsize('dist/UnderwaterEnhancer')
+
+        size_mb = total_size / (1024 * 1024)
+        size_gb = total_size / (1024 * 1024 * 1024)
+
+        if size_gb >= 1:
+            print(f'Executable size: {size_gb:.2f} GB ({total_size:,} bytes)')
+        else:
+            print(f'Executable size: {size_mb:.2f} MB ({total_size:,} bytes)')
+
+        # Warn if size seems wrong for universal build
+        if platform.system() != 'Darwin' and size_mb < 1000:
+            print('WARNING: Universal build seems too small! Expected >1GB for GPU support.')
+        "
+
     - name: Test executable exists
       run: |
         python -c "
@@ -291,77 +344,57 @@ jobs:
             sys.exit(1)
         "
 
-    - name: Smoke test - Test binary startup (Linux/Windows)
-      if: matrix.os != 'macos-latest'
+    - name: Smoke test - Test binary startup and GPU detection
       run: |
-        echo "Testing binary startup and imports..."
-        
-        # Run smoke test
+        echo "Testing binary startup and GPU detection..."
+
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
           dist/UnderwaterEnhancer.exe --smoke-test
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          # Check app bundle structure first
+          echo "Checking app bundle structure..."
+          test -f dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer || (echo "Binary not found!" && exit 1)
+          test -f dist/UnderwaterEnhancer.app/Contents/Info.plist || (echo "Info.plist not found!" && exit 1)
+          echo "  [OK] App bundle structure valid"
+
+          # Test binary execution
+          echo "Testing binary execution..."
+          dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer --smoke-test
         else
           dist/UnderwaterEnhancer --smoke-test
         fi
       shell: bash
 
-    - name: Smoke test - Test macOS app bundle
-      if: matrix.os == 'macos-latest'
+    - name: Create release archive
       run: |
-        echo "Testing macOS app bundle structure and startup..."
-        
-        # Check app bundle structure
-        echo "Checking app bundle structure..."
-        test -f dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer || (echo "Binary not found!" && exit 1)
-        test -f dist/UnderwaterEnhancer.app/Contents/Info.plist || (echo "Info.plist not found!" && exit 1)
-        echo "  [OK] App bundle structure valid"
-        
-        # Test binary can execute and import modules
-        echo "Testing binary execution..."
-        dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer --smoke-test
-
-    - name: Create release archive (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        cd dist
-        tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}.tar.gz" *
-        cd ..
-    
-    - name: Create release archive (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd dist
-        # Create a DMG for better macOS distribution (optional, falls back to zip)
-        if command -v hdiutil &> /dev/null; then
-          hdiutil create -volname "UnderwaterEnhancer" -srcfolder "UnderwaterEnhancer.app" -ov -format UDZO "../UnderwaterEnhancer-${{ matrix.platform }}.dmg" || \
-          zip -r "../UnderwaterEnhancer-${{ matrix.platform }}.zip" "UnderwaterEnhancer.app"
+        # All builds are universal (GPU/CPU support)
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          cd dist
+          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}-universal.tar.gz" *
+          cd ..
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          cd dist
+          # Create a DMG for better macOS distribution (optional, falls back to zip)
+          if command -v hdiutil &> /dev/null; then
+            hdiutil create -volname "UnderwaterEnhancer" -srcfolder "UnderwaterEnhancer.app" -ov -format UDZO "../UnderwaterEnhancer-${{ matrix.platform }}-universal.dmg" || \
+            zip -r "../UnderwaterEnhancer-${{ matrix.platform }}-universal.zip" "UnderwaterEnhancer.app"
+          else
+            zip -r "../UnderwaterEnhancer-${{ matrix.platform }}-universal.zip" "UnderwaterEnhancer.app"
+          fi
+          cd ..
         else
-          zip -r "../UnderwaterEnhancer-${{ matrix.platform }}.zip" "UnderwaterEnhancer.app"
+          # Windows
+          cp "dist/UnderwaterEnhancer.exe" "UnderwaterEnhancer-${{ matrix.platform }}-universal.exe"
         fi
-        cd ..
+      shell: bash
 
-    - name: Create release archive (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        # For Windows, we'll upload the exe directly to avoid double-zipping
-        # Just copy the exe to the root for consistent naming
-        Copy-Item "dist\UnderwaterEnhancer.exe" -Destination "UnderwaterEnhancer-${{ matrix.platform }}.exe"
-
-    - name: Upload artifacts (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: UnderwaterEnhancer-${{ matrix.platform }}
-        path: dist/*
-        retention-days: 7
-    
-    - name: Upload artifacts (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: UnderwaterEnhancer-${{ matrix.platform }}
+        name: UnderwaterEnhancer-${{ matrix.platform }}-universal
         path: |
-          UnderwaterEnhancer-${{ matrix.platform }}.*
+          UnderwaterEnhancer-${{ matrix.platform }}-universal.*
+          dist/*
         retention-days: 7
 
     - name: Upload to Release
@@ -369,7 +402,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          UnderwaterEnhancer-${{ matrix.platform }}.*
+          UnderwaterEnhancer-${{ matrix.platform }}-universal.*
         draft: false
         prerelease: false
       env:
