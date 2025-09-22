@@ -1,0 +1,371 @@
+name: Build Universal GPU/CPU GUI Application
+
+on:
+  push:
+    branches: [ main, universal-build ]
+    tags:
+      - 'v*-universal'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'universal'
+        type: choice
+        options:
+        - universal
+        - cpu-only
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            binary_name: UnderwaterEnhancer
+            gpr_binary: binaries/linux/gpr_tools
+            cuda_url: https://download.pytorch.org/whl/cu121
+          - os: windows-latest
+            platform: windows
+            binary_name: UnderwaterEnhancer.exe
+            gpr_binary: binaries/win32/gpr_tools.exe
+            cuda_url: https://download.pytorch.org/whl/cu121
+          - os: macos-latest
+            platform: macos
+            binary_name: UnderwaterEnhancer.app
+            gpr_binary: binaries/darwin/gpr_tools
+            cuda_url: none  # macOS uses standard PyTorch with MPS
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('requirements_gui.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-universal-
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libgl1 \
+          libglib2.0-0 \
+          libsm6 \
+          libxext6 \
+          libxrender1 \
+          libgomp1 \
+          libgtk-3-0 \
+          libgstreamer-gl1.0-0 \
+          libgstreamer-plugins-base1.0-0 \
+          libxcb-xinerama0 \
+          libxkbcommon-x11-0
+
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        if ! command -v cmake &> /dev/null; then
+          echo "Installing cmake..."
+          brew install cmake
+        else
+          echo "cmake is already installed: $(cmake --version | head -1)"
+        fi
+
+    - name: Setup MSVC (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install system dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        if (!(Get-Command cmake -ErrorAction SilentlyContinue)) {
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+        } else {
+          Write-Host "CMake already installed: $(cmake --version)"
+        }
+        choco install ninja -y
+
+    - name: Set UTF-8 encoding for Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
+        echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
+      shell: pwsh
+
+    - name: Create requirements_gui.txt if not exists
+      run: |
+        python -c "
+        import os
+        if not os.path.exists('requirements_gui.txt'):
+            requirements = '''# GUI Framework
+        customtkinter>=5.2.0
+        darkdetect>=0.8.0
+
+        # Image Processing
+        Pillow>=10.0.0
+        opencv-python>=4.8.0
+        scikit-image>=0.21.0
+        rawpy>=0.18.0
+        imageio>=2.31.0
+
+        # ML Dependencies (torch installed separately)
+        torchvision>=0.15.0
+        numpy>=1.24.0
+
+        # Utilities
+        PyYAML>=6.0
+        tqdm>=4.65.0
+
+        # Packaging
+        pyinstaller>=6.0.0
+        '''
+            with open('requirements_gui.txt', 'w') as f:
+                f.write(requirements)
+        "
+
+    - name: Install Python dependencies (Universal GPU/CPU Build)
+      if: github.event.inputs.build_type != 'cpu-only'
+      run: |
+        python -m pip install --upgrade pip
+
+        # Install PyTorch based on platform
+        if [ "${{ matrix.os }}" == "macos-latest" ]; then
+          echo "Installing PyTorch for macOS (includes MPS support)..."
+          pip install torch torchvision
+        else
+          echo "Installing PyTorch with CUDA support for ${{ matrix.platform }}..."
+          pip install torch torchvision --index-url ${{ matrix.cuda_url }}
+        fi
+
+        # Install other dependencies
+        pip install -r requirements_gui.txt
+
+        # Verify PyTorch installation
+        python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
+        python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+        python -c "import torch; print(f'MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, \"mps\") else False}')"
+      shell: bash
+
+    - name: Install Python dependencies (CPU-Only Build)
+      if: github.event.inputs.build_type == 'cpu-only'
+      run: |
+        python -m pip install --upgrade pip
+        echo "Installing CPU-only PyTorch..."
+        pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+        pip install -r requirements_gui.txt
+
+        # Verify PyTorch installation
+        python -c "import torch; print(f'PyTorch {torch.__version__} installed (CPU-only)')"
+      shell: bash
+
+    - name: Compile GPR tools (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        echo "Compiling GPR tools from source..."
+        chmod +x build_scripts/compile_gpr_tools.sh
+        ./build_scripts/compile_gpr_tools.sh
+        if [ $? -ne 0 ]; then
+          echo "FATAL: GPR tools compilation failed"
+          exit 1
+        fi
+
+        # Verify binary exists and is valid
+        if [ ! -f "${{ matrix.gpr_binary }}" ]; then
+          echo "FATAL: GPR tools binary not found at expected location: ${{ matrix.gpr_binary }}"
+          exit 1
+        fi
+
+        # Check file size
+        SIZE=$(stat -f%z "${{ matrix.gpr_binary }}" 2>/dev/null || stat -c%s "${{ matrix.gpr_binary }}")
+        if [ "$SIZE" -lt 10000 ]; then
+          echo "FATAL: GPR tools binary is too small ($SIZE bytes)"
+          exit 1
+        fi
+
+        echo "SUCCESS: GPR tools binary found and validated"
+        ls -la "${{ matrix.gpr_binary }}"
+
+    - name: Compile GPR tools (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: cmd
+      run: |
+        echo Compiling GPR tools from source...
+        build_scripts\compile_gpr_tools.bat
+        if %ERRORLEVEL% neq 0 (
+          echo FATAL: GPR tools compilation failed with exit code %ERRORLEVEL%
+          exit /b 1
+        )
+
+        if not exist "${{ matrix.gpr_binary }}" (
+          echo FATAL: GPR tools binary not found at expected location: ${{ matrix.gpr_binary }}
+          exit /b 1
+        )
+
+        for %%I in ("${{ matrix.gpr_binary }}") do set SIZE=%%~zI
+        if %SIZE% LSS 10000 (
+          echo FATAL: GPR tools binary is too small (%SIZE% bytes)
+          exit /b 1
+        )
+
+        echo SUCCESS: GPR tools binary found and validated
+        dir "${{ matrix.gpr_binary }}"
+
+    - name: Create placeholder icons
+      run: |
+        python -c "
+        from pathlib import Path
+        import os
+
+        Path('assets').mkdir(exist_ok=True)
+
+        try:
+            from PIL import Image, ImageDraw
+            size = 256
+            img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.ellipse([10, 10, size-10, size-10], fill=(30, 144, 255))
+            img.save('assets/icon.png')
+            print('Created icon.png')
+
+            if '${{ matrix.os }}' == 'windows-latest':
+                img.save('assets/icon.ico', format='ICO', sizes=[(256, 256)])
+                print('Created icon.ico')
+        except ImportError:
+            print('PIL not available, skipping icon creation')
+        "
+
+    - name: Build with PyInstaller
+      run: |
+        echo "Building executable..."
+        pyinstaller pyinstaller.spec --clean --noconfirm
+
+        # Log build info
+        BUILD_TYPE="${{ github.event.inputs.build_type }}"
+        if [ "$BUILD_TYPE" == "cpu-only" ]; then
+          echo "Built CPU-only executable"
+        else
+          echo "Built universal GPU/CPU executable"
+        fi
+      shell: bash
+
+    - name: Fix macOS App Permissions
+      if: matrix.os == 'macos-latest'
+      run: |
+        chmod +x dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer
+        xattr -cr dist/UnderwaterEnhancer.app || true
+        codesign --force --deep --sign - dist/UnderwaterEnhancer.app
+        echo "App has been ad-hoc signed"
+
+    - name: Check executable size
+      run: |
+        python -c "
+        import os
+        import platform
+
+        if platform.system() == 'Darwin':
+            # macOS app bundle
+            app_path = 'dist/UnderwaterEnhancer.app'
+            total_size = sum(
+                os.path.getsize(os.path.join(dirpath, filename))
+                for dirpath, dirnames, filenames in os.walk(app_path)
+                for filename in filenames
+            )
+        elif platform.system() == 'Windows':
+            total_size = os.path.getsize('dist/UnderwaterEnhancer.exe')
+        else:
+            total_size = os.path.getsize('dist/UnderwaterEnhancer')
+
+        size_mb = total_size / (1024 * 1024)
+        size_gb = total_size / (1024 * 1024 * 1024)
+
+        if size_gb >= 1:
+            print(f'Executable size: {size_gb:.2f} GB ({total_size:,} bytes)')
+        else:
+            print(f'Executable size: {size_mb:.2f} MB ({total_size:,} bytes)')
+
+        # Warn if size seems wrong
+        if '${{ github.event.inputs.build_type }}' != 'cpu-only':
+            if platform.system() != 'Darwin' and size_mb < 1000:
+                print('WARNING: Universal build seems too small! Expected >1GB for GPU support.')
+        else:
+            if size_mb > 500:
+                print('WARNING: CPU-only build seems too large! Expected <500MB.')
+        "
+
+    - name: Smoke test - Test binary startup
+      run: |
+        echo "Testing binary startup and GPU detection..."
+
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          dist/UnderwaterEnhancer.exe --smoke-test
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer --smoke-test
+        else
+          dist/UnderwaterEnhancer --smoke-test
+        fi
+      shell: bash
+
+    - name: Create release archive with build info
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type }}"
+        if [ "$BUILD_TYPE" == "cpu-only" ]; then
+          SUFFIX="cpu"
+        else
+          SUFFIX="universal"
+        fi
+
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          cd dist
+          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}-${SUFFIX}.tar.gz" *
+          cd ..
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          cd dist
+          zip -r "../UnderwaterEnhancer-${{ matrix.platform }}-${SUFFIX}.zip" "UnderwaterEnhancer.app"
+          cd ..
+        else
+          # Windows
+          cp "dist/UnderwaterEnhancer.exe" "UnderwaterEnhancer-${{ matrix.platform }}-${SUFFIX}.exe"
+        fi
+      shell: bash
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: UnderwaterEnhancer-${{ matrix.platform }}-${{ github.event.inputs.build_type || 'universal' }}
+        path: |
+          UnderwaterEnhancer-${{ matrix.platform }}-*
+          dist/*
+        retention-days: 7
+
+    - name: Upload to Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          UnderwaterEnhancer-${{ matrix.platform }}-*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
