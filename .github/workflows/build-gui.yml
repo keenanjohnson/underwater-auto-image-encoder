@@ -394,7 +394,6 @@ jobs:
         name: UnderwaterEnhancer-${{ matrix.platform }}-universal
         path: |
           UnderwaterEnhancer-${{ matrix.platform }}-universal.*
-          dist/*
         retention-days: 7
 
     - name: Upload to Release
