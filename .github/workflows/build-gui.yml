@@ -15,8 +15,8 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false  # Don't cancel other jobs if one fails
       matrix:
-        # Windows build temporarily disabled - will be fixed in separate PR
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
