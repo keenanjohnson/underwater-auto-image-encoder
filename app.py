@@ -16,7 +16,7 @@ from datetime import datetime
 # Add source directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-def setup_logging():
+def setup_logging(version=__version__):
     """Setup file logging for crash diagnosis"""
     # Determine log directory based on platform
     if sys.platform == 'win32':
@@ -45,10 +45,13 @@ def setup_logging():
 
     # Log startup information
     logger = logging.getLogger(__name__)
-    logger.info(f"Underwater Enhancer v{__version__} starting")
+    logger.info(f"Underwater Enhancer v{version} starting")
     logger.info(f"Python version: {sys.version}")
     logger.info(f"Platform: {sys.platform}")
     logger.info(f"Log file: {log_file}")
+
+    # Store version for use in exception handler
+    app_version = version
 
     # Set up global exception handler to catch unhandled exceptions
     def handle_exception(exc_type, exc_value, exc_traceback):
@@ -62,7 +65,7 @@ def setup_logging():
         crash_file = log_dir / f'crash_{timestamp}.txt'
         with open(crash_file, 'w') as f:
             f.write(f"Underwater Enhancer Crash Report\n")
-            f.write(f"Version: {__version__}\n")
+            f.write(f"Version: {app_version}\n")
             f.write(f"Time: {datetime.now().isoformat()}\n")
             f.write(f"Python: {sys.version}\n")
             f.write(f"Platform: {sys.platform}\n\n")
@@ -147,7 +150,7 @@ def main():
         return
 
     # Set up logging first
-    log_file = setup_logging()
+    log_file = setup_logging(__version__)
     logger = logging.getLogger(__name__)
 
     try:
