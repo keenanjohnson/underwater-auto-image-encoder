@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta
 import sys
 from typing import Optional
+import torch
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -77,7 +78,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
         
         # Title
         title_label = ctk.CTkLabel(
-            main_container, 
+            main_container,
             text="Underwater Image Enhancer",
             font=ctk.CTkFont(size=24, weight="bold")
         )
@@ -237,7 +238,44 @@ class UnderwaterEnhancerApp(ctk.CTk):
             state="disabled"
         )
         self.cancel_btn.pack(side="left", padx=5)
-        
+
+        # GPU/CPU indicator in the middle
+        device_type = "GPU" if torch.cuda.is_available() else "CPU"
+        device_color = "green" if torch.cuda.is_available() else "orange"
+
+        # Get additional device info
+        if torch.cuda.is_available():
+            try:
+                gpu_name = torch.cuda.get_device_name(0)
+                device_tooltip = f"{gpu_name}"
+            except:
+                device_tooltip = "Hardware Accelerated"
+        else:
+            device_tooltip = "CPU Processing"
+
+        # Create a frame for the device indicator
+        device_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
+        device_frame.pack(side="left", padx=(50, 0), expand=True)
+
+        # Device label with colored background
+        self.device_label = ctk.CTkLabel(
+            device_frame,
+            text=f" {device_type} Mode ",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=device_color,
+            corner_radius=6
+        )
+        self.device_label.pack(side="left")
+
+        # Add device info
+        self.device_info_label = ctk.CTkLabel(
+            device_frame,
+            text=f" • {device_tooltip}",
+            font=ctk.CTkFont(size=11),
+            text_color="gray"
+        )
+        self.device_info_label.pack(side="left", padx=(5, 0))
+
         # Theme toggle
         self.theme_btn = ctk.CTkButton(
             control_frame,
@@ -374,7 +412,14 @@ class UnderwaterEnhancerApp(ctk.CTk):
             
             self.log("Loading model...")
             self.processor.load_model()
-            self.log("Model loaded successfully - Full resolution processing enabled (with tiling for large images)")
+
+            # Get and log device information
+            device_name, is_gpu = self.processor.get_device_info()
+            if is_gpu:
+                self.log(f"✓ Model loaded successfully - Using GPU: {device_name}")
+            else:
+                self.log(f"✓ Model loaded successfully - Using CPU (GPU not available)")
+            self.log("Full resolution processing enabled (with tiling for large images)")
             
             # Setup paths
             output_dir = Path(self.output_path_var.get())
