@@ -145,6 +145,29 @@ if system == 'darwin':
     )
 else:
     # Windows/Linux: Use onefile mode with optimizations
+
+    # Platform-specific UPX exclusions
+    if system == 'windows':
+        # On Windows, only exclude critical DLLs that break when compressed
+        upx_excludes = [
+            '*.pyd',  # Python extensions
+            'nvToolsExt*.dll',  # NVIDIA tools (known to fail)
+            'cudart*.dll',  # CUDA runtime
+            'cublas*.dll',  # CUDA BLAS
+            'cufft*.dll',  # CUDA FFT
+            'curand*.dll',  # CUDA random
+            'cusolver*.dll',  # CUDA solver
+            'cusparse*.dll',  # CUDA sparse
+            'cudnn*.dll',  # cuDNN
+            'nvrtc*.dll',  # NVIDIA runtime compilation
+            'api-ms-win*.dll',  # Windows API
+            'vcruntime*.dll',  # Visual C++ runtime
+            'msvcp*.dll',  # Microsoft C++ runtime
+        ]
+    else:
+        # Linux: exclude .so files
+        upx_excludes = ['*.so']
+
     exe = EXE(
         pyz,
         a.scripts,
@@ -155,9 +178,9 @@ else:
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
-        strip=True,  # Strip symbols to reduce size
+        strip=True if system == 'linux' else False,  # Strip only on Linux
         upx=True,
-        upx_exclude=['*.pyd', '*.so', '*.dll'],  # Don't compress shared libs
+        upx_exclude=upx_excludes,
         runtime_tmpdir=None,
         console=False,  # Set to True for debugging
         disable_windowed_traceback=False,
