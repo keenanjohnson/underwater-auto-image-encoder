@@ -101,7 +101,6 @@ excludes = [
 
     # Test frameworks
     'pytest',
-    'unittest',
     'test',
     'tests',
 
