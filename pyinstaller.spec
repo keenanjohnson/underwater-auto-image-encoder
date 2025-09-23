@@ -133,7 +133,6 @@ excludes = [
     # Unused data science libraries
     'pandas',
     'scipy.stats',  # Keep core scipy for skimage
-    'sympy',
     'statsmodels',
 ]
 
