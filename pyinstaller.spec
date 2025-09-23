@@ -96,7 +96,6 @@ excludes = [
     'torchvision.models.segmentation',  # Segmentation models
     'torchvision.models.video',  # Video models
     'torchvision.models.quantization',  # Quantized models
-    'torchvision.ops',  # Extra operations
 
     # Test frameworks
     'pytest',
