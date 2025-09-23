@@ -97,7 +97,7 @@ excludes = [
     'torch.jit.mobile',
     'torch.onnx',
     'torch.quantization',
-    'torch.sparse',
+    # 'torch.sparse',  # Required by torch internals
     'torch.fx',  # graph mode
     'torch.package',
 
