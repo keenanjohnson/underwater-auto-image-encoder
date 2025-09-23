@@ -124,7 +124,7 @@ if system == 'darwin':
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
-        strip=False,
+        strip=True,  # Strip symbols to reduce size
         upx=True,
         console=False,  # No console for macOS app
         disable_windowed_traceback=False,
@@ -138,13 +138,13 @@ if system == 'darwin':
         a.binaries,
         a.zipfiles,
         a.datas,
-        strip=False,
+        strip=True,  # Strip symbols to reduce size
         upx=True,
-        upx_exclude=[],
+        upx_exclude=['*.pyd', '*.so', '*.dylib'],  # Don't compress shared libs
         name='UnderwaterEnhancer',
     )
 else:
-    # Windows/Linux: Use onefile mode
+    # Windows/Linux: Use onefile mode with optimizations
     exe = EXE(
         pyz,
         a.scripts,
@@ -155,9 +155,9 @@ else:
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
-        strip=False,
+        strip=True,  # Strip symbols to reduce size
         upx=True,
-        upx_exclude=[],
+        upx_exclude=['*.pyd', '*.so', '*.dll'],  # Don't compress shared libs
         runtime_tmpdir=None,
         console=False,  # Set to True for debugging
         disable_windowed_traceback=False,
