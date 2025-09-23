@@ -83,28 +83,21 @@ for root, dirs, files in os.walk('src'):
 
 # Exclude unnecessary modules while keeping GPU support
 excludes = [
-    # Exclude torch components we don't need for inference
-    'torch.distributions',
-    # 'torch.testing',  # Required by torch internals
-    'torch.utils.tensorboard',
-    'torch.utils.bottleneck',
-    'torch.utils.benchmark',
-    'torch.utils.cpp_extension',
-    'torch.utils.mobile_optimizer',
-    'torch.profiler',
-    'torch.ao',  # quantization
-    'torch.jit.mobile',
-    'torch.onnx',
-    'torch.quantization',
+    # Safe exclusions - these are definitely not needed for inference
+    'torch.utils.tensorboard',  # TensorBoard logging
+    'torch.utils.bottleneck',  # Profiling tool
+    'torch.utils.benchmark',  # Benchmarking tool
+    'torch.utils.cpp_extension',  # For building C++ extensions
+    'torch.utils.mobile_optimizer',  # Mobile optimization
 
     # Exclude torchvision extras we don't use
-    'torchvision.datasets',
-    'torchvision.io.video',
-    'torchvision.models.detection',
-    'torchvision.models.segmentation',
-    'torchvision.models.video',
-    'torchvision.models.quantization',
-    'torchvision.ops',
+    'torchvision.datasets',  # Dataset loaders
+    'torchvision.io.video',  # Video processing
+    'torchvision.models.detection',  # Object detection models
+    'torchvision.models.segmentation',  # Segmentation models
+    'torchvision.models.video',  # Video models
+    'torchvision.models.quantization',  # Quantized models
+    'torchvision.ops',  # Extra operations
 
     # Test frameworks
     'pytest',
