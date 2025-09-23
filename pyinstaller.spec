@@ -85,7 +85,7 @@ for root, dirs, files in os.walk('src'):
 excludes = [
     # Exclude torch components we don't need for inference
     'torch.distributions',
-    'torch.testing',
+    # 'torch.testing',  # Required by torch internals
     'torch.utils.tensorboard',
     'torch.utils.bottleneck',
     'torch.utils.benchmark',
