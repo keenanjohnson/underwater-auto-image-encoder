@@ -92,7 +92,6 @@ excludes = [
 
     # Exclude torchvision extras we don't use
     'torchvision.datasets',  # Dataset loaders
-    'torchvision.io.video',  # Video processing
     'torchvision.models.detection',  # Object detection models
     'torchvision.models.segmentation',  # Segmentation models
     'torchvision.models.video',  # Video models
