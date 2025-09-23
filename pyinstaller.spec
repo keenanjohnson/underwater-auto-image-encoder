@@ -93,7 +93,6 @@ excludes = [
     'torch.utils.mobile_optimizer',
     'torch.profiler',
     'torch.ao',  # quantization
-    'torch.distributed',
     'torch.jit.mobile',
     'torch.onnx',
     'torch.quantization',
