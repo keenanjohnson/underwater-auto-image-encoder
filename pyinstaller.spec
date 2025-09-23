@@ -81,6 +81,54 @@ for root, dirs, files in os.walk('src'):
 
 # Silently collect files (debug output removed)
 
+# Exclude unnecessary modules while keeping GPU support
+excludes = [
+    # Safe exclusions - these are definitely not needed for inference
+    'torch.utils.tensorboard',  # TensorBoard logging
+    'torch.utils.bottleneck',  # Profiling tool
+    'torch.utils.benchmark',  # Benchmarking tool
+    'torch.utils.cpp_extension',  # For building C++ extensions
+    'torch.utils.mobile_optimizer',  # Mobile optimization
+
+    # Test frameworks
+    'pytest',
+    'test',
+    'tests',
+
+    # Development/debug tools
+    'IPython',
+    'jupyter',
+    'notebook',
+    'ipykernel',
+    'ipywidgets',
+    'tensorboard',
+    'setuptools',
+    'pip',
+
+    # Visualization libraries we don't use
+    'matplotlib',
+    'seaborn',
+    'plotly',
+    'bokeh',
+
+    # Other ML frameworks
+    'tensorflow',
+    'keras',
+    'jax',
+    'transformers',
+
+    # Web frameworks
+    'flask',
+    'django',
+    'fastapi',
+    'uvicorn',
+
+    # Unused data science libraries
+    'pandas',
+    'scipy.stats',  # Keep core scipy for skimage
+    'statsmodels',
+]
+
 a = Analysis(
     ['app.py'],
     pathex=[str(Path.cwd())],  # Add absolute path to current directory
@@ -105,12 +153,96 @@ a = Analysis(
     hookspath=['.'],  # Use local hooks directory
     hooksconfig={},
     runtime_hooks=['runtime_hook.py'],
-    excludes=[],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
+
+# Remove unnecessary binaries to reduce size
+print("Removing unnecessary binaries...")
+binaries_to_remove = []
+for (dest, source, kind) in a.binaries:
+    dest_lower = dest.lower()
+
+    # Remove test and benchmark binaries
+    if any(x in dest_lower for x in ['_test', 'test_', 'benchmark', '_bench']):
+        binaries_to_remove.append((dest, source, kind))
+        print(f"  Removing test/benchmark: {dest}")
+        continue
+
+    # Remove duplicate/unnecessary MKL libraries (keep core ones)
+    if 'mkl' in dest_lower:
+        # Remove large MKL libraries we don't need
+        if any(x in dest_lower for x in ['mkl_avx2', 'mkl_avx512', 'mkl_mc', 'mkl_mc3', 'mkl_def', 'mkl_vml_']):
+            binaries_to_remove.append((dest, source, kind))
+            print(f"  Removing MKL library: {dest}")
+            continue
+
+    # Remove debug libraries
+    if dest_lower.endswith('_d.dll') or dest_lower.endswith('_d.so') or '_debug' in dest_lower:
+        binaries_to_remove.append((dest, source, kind))
+        print(f"  Removing debug library: {dest}")
+        continue
+
+    # Remove CUDA libraries for architectures we don't need (keep only common ones)
+    if 'cuda' in dest_lower and any(x in dest_lower for x in ['sm_35', 'sm_37', 'sm_50', 'sm_52']):
+        binaries_to_remove.append((dest, source, kind))
+        print(f"  Removing old CUDA arch: {dest}")
+        continue
+
+    # Remove large torch libraries we don't need
+    if 'torch' in dest_lower:
+        # Remove torch testing libraries
+        if any(x in dest_lower for x in ['torch_test', 'test_torch', '_test.', 'testing']):
+            binaries_to_remove.append((dest, source, kind))
+            print(f"  Removing torch test library: {dest}")
+            continue
+
+        # Remove torch profiler libraries if present
+        if 'profiler' in dest_lower:
+            binaries_to_remove.append((dest, source, kind))
+            print(f"  Removing torch profiler: {dest}")
+            continue
+
+print(f"Removing {len(binaries_to_remove)} unnecessary binaries")
+for item in binaries_to_remove:
+    if item in a.binaries:
+        a.binaries.remove(item)
+
+# Remove unnecessary data files
+print("Removing unnecessary data files...")
+datas_to_remove = []
+for (dest, source, kind) in a.datas:
+    dest_lower = dest.lower()
+
+    # Remove documentation and examples
+    if any(x in dest_lower for x in ['/doc/', '/docs/', '/documentation/', '/examples/', '/example/',
+                                      '/test/', '/tests/', '/testing/', '/sample/', '/samples/',
+                                      '.md', '.rst', '.txt', 'readme', 'license', 'changelog']):
+        datas_to_remove.append((dest, source, kind))
+        continue
+
+    # Remove source maps and debug files
+    if any(dest.endswith(x) for x in ['.map', '.pdb', '.exp', '.lib', '.a']):
+        datas_to_remove.append((dest, source, kind))
+        continue
+
+    # Remove TypeScript files and other source files we don't need at runtime
+    if any(dest.endswith(x) for x in ['.ts', '.tsx', '.jsx', '.coffee', '.scss', '.sass', '.less']):
+        datas_to_remove.append((dest, source, kind))
+        continue
+
+    # Remove translation/locale files except English
+    if ('/locale/' in dest or '/locales/' in dest or '/translations/' in dest) and '/en' not in dest_lower:
+        datas_to_remove.append((dest, source, kind))
+        continue
+
+print(f"Removing {len(datas_to_remove)} unnecessary data files")
+for item in datas_to_remove:
+    if item in a.datas:
+        a.datas.remove(item)
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
@@ -124,7 +256,7 @@ if system == 'darwin':
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
-        strip=False,
+        strip=True,  # Strip symbols to reduce size
         upx=True,
         console=False,  # No console for macOS app
         disable_windowed_traceback=False,
@@ -138,13 +270,36 @@ if system == 'darwin':
         a.binaries,
         a.zipfiles,
         a.datas,
-        strip=False,
+        strip=True,  # Strip symbols to reduce size
         upx=True,
-        upx_exclude=[],
+        upx_exclude=['*.pyd', '*.so', '*.dylib'],  # Don't compress shared libs
         name='UnderwaterEnhancer',
     )
 else:
-    # Windows/Linux: Use onefile mode
+    # Windows/Linux: Use onefile mode with optimizations
+
+    # Platform-specific UPX exclusions
+    if system == 'windows':
+        # On Windows, only exclude critical DLLs that break when compressed
+        upx_excludes = [
+            '*.pyd',  # Python extensions
+            'nvToolsExt*.dll',  # NVIDIA tools (known to fail)
+            'cudart*.dll',  # CUDA runtime
+            'cublas*.dll',  # CUDA BLAS
+            'cufft*.dll',  # CUDA FFT
+            'curand*.dll',  # CUDA random
+            'cusolver*.dll',  # CUDA solver
+            'cusparse*.dll',  # CUDA sparse
+            'cudnn*.dll',  # cuDNN
+            'nvrtc*.dll',  # NVIDIA runtime compilation
+            'api-ms-win*.dll',  # Windows API
+            'vcruntime*.dll',  # Visual C++ runtime
+            'msvcp*.dll',  # Microsoft C++ runtime
+        ]
+    else:
+        # Linux: exclude .so files
+        upx_excludes = ['*.so']
+
     exe = EXE(
         pyz,
         a.scripts,
@@ -155,9 +310,9 @@ else:
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
-        strip=False,
+        strip=True if system == 'linux' else False,  # Strip only on Linux
         upx=True,
-        upx_exclude=[],
+        upx_exclude=upx_excludes,
         runtime_tmpdir=None,
         console=False,  # Set to True for debugging
         disable_windowed_traceback=False,
