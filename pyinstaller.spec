@@ -97,7 +97,6 @@ excludes = [
     'torch.onnx',
     'torch.quantization',
     'torch.fx',  # graph mode
-    'torch.package',
 
     # Exclude torchvision extras we don't use
     'torchvision.datasets',
