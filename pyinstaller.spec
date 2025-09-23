@@ -90,13 +90,6 @@ excludes = [
     'torch.utils.cpp_extension',  # For building C++ extensions
     'torch.utils.mobile_optimizer',  # Mobile optimization
 
-    # Exclude torchvision extras we don't use
-    'torchvision.datasets',  # Dataset loaders
-    'torchvision.models.detection',  # Object detection models
-    'torchvision.models.segmentation',  # Segmentation models
-    'torchvision.models.video',  # Video models
-    'torchvision.models.quantization',  # Quantized models
-
     # Test frameworks
     'pytest',
     'test',
