@@ -81,6 +81,76 @@ for root, dirs, files in os.walk('src'):
 
 # Silently collect files (debug output removed)
 
+# Exclude unnecessary modules while keeping GPU support
+excludes = [
+    # Exclude torch components we don't need for inference
+    'torch.distributions',
+    'torch.testing',
+    'torch.utils.tensorboard',
+    'torch.utils.bottleneck',
+    'torch.utils.benchmark',
+    'torch.utils.cpp_extension',
+    'torch.utils.mobile_optimizer',
+    'torch.profiler',
+    'torch.ao',  # quantization
+    'torch.distributed',
+    'torch.jit.mobile',
+    'torch.onnx',
+    'torch.quantization',
+    'torch.sparse',
+    'torch.fx',  # graph mode
+    'torch.package',
+
+    # Exclude torchvision extras we don't use
+    'torchvision.datasets',
+    'torchvision.io.video',
+    'torchvision.models.detection',
+    'torchvision.models.segmentation',
+    'torchvision.models.video',
+    'torchvision.models.quantization',
+    'torchvision.ops',
+
+    # Test frameworks
+    'pytest',
+    'unittest',
+    'test',
+    'tests',
+
+    # Development/debug tools
+    'IPython',
+    'jupyter',
+    'notebook',
+    'ipykernel',
+    'ipywidgets',
+    'tensorboard',
+    'setuptools',
+    'pip',
+
+    # Visualization libraries we don't use
+    'matplotlib',
+    'seaborn',
+    'plotly',
+    'bokeh',
+
+    # Other ML frameworks
+    'tensorflow',
+    'keras',
+    'jax',
+    'transformers',
+
+    # Web frameworks
+    'flask',
+    'django',
+    'fastapi',
+    'uvicorn',
+
+    # Unused data science libraries
+    'pandas',
+    'scipy.stats',  # Keep core scipy for skimage
+    'sympy',
+    'statsmodels',
+]
+
 a = Analysis(
     ['app.py'],
     pathex=[str(Path.cwd())],  # Add absolute path to current directory
@@ -105,7 +175,7 @@ a = Analysis(
     hookspath=['.'],  # Use local hooks directory
     hooksconfig={},
     runtime_hooks=['runtime_hook.py'],
-    excludes=[],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
