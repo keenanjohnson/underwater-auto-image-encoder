@@ -36,46 +36,77 @@ class GPRPreprocessor:
         self.raw_dir.mkdir(exist_ok=True)
         self.cropped_dir.mkdir(exist_ok=True)
         
-    def check_gpr_tools(self) -> bool:
-        """Check if gpr_tools is available"""
+    def find_gpr_tools(self) -> Optional[str]:
+        """Find gpr_tools executable (local binary or system PATH)"""
+        # Check local binaries first (macOS/Linux/Windows)
+        import platform
+        system = platform.system().lower()
+
+        if system == 'darwin':
+            local_path = Path(__file__).parent / 'binaries' / 'darwin' / 'gpr_tools'
+        elif system == 'linux':
+            local_path = Path(__file__).parent / 'binaries' / 'linux' / 'gpr_tools'
+        elif system == 'windows':
+            local_path = Path(__file__).parent / 'binaries' / 'windows' / 'gpr_tools.exe'
+        else:
+            local_path = None
+
+        if local_path and local_path.exists():
+            logger.info(f"Found local gpr_tools at: {local_path}")
+            return str(local_path)
+
+        # Check system PATH
         try:
             result = subprocess.run(['which', 'gpr_tools'], capture_output=True, text=True)
             if result.returncode == 0:
-                logger.info(f"Found gpr_tools at: {result.stdout.strip()}")
-                return True
-        except Exception as e:
-            logger.error(f"Error checking for gpr_tools: {e}")
+                path = result.stdout.strip()
+                logger.info(f"Found gpr_tools in PATH at: {path}")
+                return path
+        except Exception:
+            pass
+
+        return None
+
+    def check_gpr_tools(self) -> bool:
+        """Check if gpr_tools is available"""
+        gpr_path = self.find_gpr_tools()
+        if gpr_path:
+            self.gpr_tools_path = gpr_path
+            return True
         return False
     
     def convert_gpr_to_dng(self, gpr_path: Path) -> Optional[Path]:
         """
         Convert GPR file to DNG using gpr_tools
-        
+
         Args:
             gpr_path: Path to GPR file
-            
+
         Returns:
             Path to converted DNG file or None if conversion failed
         """
         dng_path = self.raw_dir / f"{gpr_path.stem}.dng"
-        
+
         try:
+            # Use stored gpr_tools path (falls back to 'gpr_tools' if not set)
+            gpr_cmd = getattr(self, 'gpr_tools_path', 'gpr_tools')
+
             cmd = [
-                'gpr_tools',
+                gpr_cmd,
                 '-i', str(gpr_path),
                 '-o', str(dng_path)
             ]
-            
+
             logger.info(f"Converting {gpr_path.name} to DNG...")
             result = subprocess.run(cmd, capture_output=True, text=True)
-            
+
             if result.returncode == 0 and dng_path.exists():
                 logger.info(f"Successfully converted to {dng_path.name}")
                 return dng_path
             else:
                 logger.error(f"Conversion failed: {result.stderr}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error converting {gpr_path}: {e}")
             return None
