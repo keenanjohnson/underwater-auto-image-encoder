@@ -131,7 +131,7 @@ python train.py \
   --output-dir output_fullsize
 ```
 
-**Warning:** Requires 80GB+ GPU memory or will run very slowly
+**Warning:** Requires 24GB+ GPU memory for batch size 1, or will run very slowly
 
 ### 5. Small Dataset / Quick Test
 
