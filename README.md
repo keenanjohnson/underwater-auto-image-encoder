@@ -113,23 +113,18 @@ python ./prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jp
 
 #### 3. Train the Model
 
-**Option A: Local Training (CPU/GPU)**
 ```bash
-# Train with standard U-Net using config
-python train_unet.py
+# Train with standard U-Net (auto-detects GPU/CPU)
+python train.py
 
-# The script will:
-# - Load config.yaml settings
-# - Initialize Standard U-Net (~31M parameters)
-# - Use Combined L1+MSE loss (80%/20%)
-# - Auto-detect GPU/CPU
+# Resume from checkpoint
+python train.py --resume checkpoints/checkpoint_epoch_10.pth
+
+# Monitor progress
+tensorboard --logdir logs
 ```
 
-**Option B: Google Colab Training (Recommended)**
-1. Upload `train_underwater_enhancer_colab.ipynb` to Google Colab
-2. Set runtime to GPU (Runtime → Change runtime type → GPU)
-3. Run all cells - dataset loads from Google Drive after first run
-4. Models save automatically to Google Drive
+For detailed training options and Google Colab setup, see [TRAINING.md](TRAINING.md).
 
 #### 4. Run Inference
 ```bash
@@ -169,45 +164,31 @@ python denoise_tiff.py input.tiff --preserve-range
 
 ## 🏗️ Architecture
 
-### Standard U-Net Model
-- **Architecture**: Standard U-Net with skip connections
-- **Parameters**: ~31M parameters for optimal quality
-- **Feature progression**: 64 → 128 → 256 → 512 → 1024 channels
-- **Purpose**: Designed specifically for underwater image enhancement
+### U-Net Model
+- Standard U-Net with skip connections (~31M parameters)
+- Feature progression: 64 → 128 → 256 → 512 → 1024 channels
+- Combined L1+MSE loss (80%/20%) for detail preservation and color consistency
+- Tiled processing for high-resolution images (>2048px)
+- Optional post-processing denoising with multiple algorithms
 
-### Key Features
-- **Skip connections** for detail preservation
-- **Multi-scale processing** for global and local enhancement
-- **Combined L1+MSE loss** for sharp details and color consistency
-- **Optimized for underwater characteristics** (color correction, contrast enhancement)
-- **Tiled processing** for high-resolution images (>2048px) to avoid memory issues
-- **Post-processing denoising** with 7 different algorithms for final quality enhancement
+For detailed architecture information, see [CLAUDE.md](CLAUDE.md).
 
-## 📊 Training Details
+## 📊 Training
 
-### Loss Function
-- **Combined L1+MSE Loss**: 
-  - 80% L1 Loss for sharp detail preservation
-  - 20% MSE Loss for color and brightness consistency
-- **Optimized for underwater enhancement**: Balances detail and color correction
+The model uses a standard U-Net architecture trained on paired raw/enhanced underwater images.
 
-### Training Options
+**Quick start:**
+```bash
+python train.py
+```
 
-**Option 1: Google Colab (Recommended)**
-- Use `train_underwater_enhancer_colab.ipynb` 
-- Free GPU access, dataset caching to Google Drive
-- Automatic model saving and resuming
+**Key features:**
+- Auto-detects GPU/CPU
+- Early stopping and learning rate scheduling
+- Validation comparisons every 5 epochs
+- Google Colab notebook available for free GPU training
 
-**Option 2: Local Training**
-- Use `train_unet.py` with your local GPU/CPU
-- Requires manual dataset setup
-- Good for development and testing
-
-### Memory Optimization
-- Mixed precision training (FP16)
-- Gradient checkpointing
-- Configurable batch sizes
-- Progressive image scaling
+For complete training documentation, command-line options, and hardware requirements, see [TRAINING.md](TRAINING.md).
 
 ## 📁 Project Structure
 
@@ -219,7 +200,7 @@ auto-image-encoder/
 ├── photos/                         # Full dataset (3414 image pairs)
 │   ├── input_GPR/                  # All GPR input images
 │   └── human_output_JPEG/          # All manually edited images
-├── train_unet.py                   # Local training script (Standard U-Net)
+├── train.py                        # Local training script (Standard U-Net)
 ├── train_underwater_enhancer_colab.ipynb  # Google Colab notebook
 ├── inference.py                    # Inference script with tiled processing
 ├── denoise_tiff.py                # Post-processing denoising script
@@ -230,77 +211,19 @@ auto-image-encoder/
 
 ## ⚙️ Configuration
 
-Edit `config.yaml` to customize training:
+Edit `config.yaml` to customize training parameters (batch size, learning rate, loss weights, etc.).
 
-```yaml
-# Model Configuration (Standard U-Net)
-model:
-  n_channels: 3  # Input channels (RGB)
-  n_classes: 3   # Output channels (RGB)
-  # Fixed architecture: 64 → 128 → 256 → 512 → 1024
+Key settings:
+- `batch_size`: 16 (reduce if out of memory)
+- `image_size`: [256, 256] (training patch size)
+- `learning_rate`: 0.0001
+- Loss weights: L1=0.8, MSE=0.2
 
-# Training parameters
-training:
-  epochs: 50
-  learning_rate: 0.0001
-  lr_scheduler: "reduce_on_plateau"
-  optimizer: "adam"
-  
-  # Loss configuration
-  loss:
-    l1_weight: 0.8    # L1 loss for sharp details
-    mse_weight: 0.2   # MSE loss for color consistency
-  
-# Data settings
-data:
-  batch_size: 16
-  image_size: [256, 256]  # Balanced for quality and GPU memory
-  train_split: 0.8
-  input_dir: "dataset/input_GPR"
-  target_dir: "dataset/human_output_JPEG"
-```
+See [TRAINING.md](TRAINING.md) for complete configuration options and troubleshooting.
 
-## 🔧 Troubleshooting
+## 🎯 Results
 
-### GPU Memory Issues
-```yaml
-# Reduce memory usage
-data:
-  batch_size: 8      # Reduce from 16
-  image_size: [128, 128]  # Reduce from 256
-
-hardware:
-  mixed_precision: false  # Keep false for stability
-```
-
-### Training Not Converging
-```yaml
-# Adjust learning rate and loss weights
-training:
-  learning_rate: 0.001    # Increase learning rate
-  loss:
-    l1_weight: 0.9        # Emphasize sharp details
-    mse_weight: 0.1       # Reduce color smoothing
-```
-
-### For CPU Training
-- Use Google Colab with GPU instead (much faster)
-- If you must use CPU, reduce batch_size to 1 and image_size to [128, 128]
-
-## 📈 Monitoring Training
-
-- **TensorBoard**: `tensorboard --logdir logs`
-- **Validation images**: Updated every 5 epochs
-- **Automatic checkpointing**: Best model saved based on validation loss
-- **Early stopping**: Prevents overfitting (20 epoch patience)
-
-## 🎯 Expected Results
-
-The trained model should reproduce manual Lightroom adjustments:
-- **Denoise**: Noise reduction (equivalent to setting 55)
-- **White balance**: Automatic underwater color correction
-- **Tone adjustments**: Exposure, highlights, shadows, whites, blacks
-- **Contrast enhancement**: Improved clarity and detail
+The trained model reproduces manual Lightroom adjustments including denoising, white balance correction, tone adjustments, and contrast enhancement for underwater images.
 
 ## 📚 References
 

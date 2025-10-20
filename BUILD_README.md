@@ -1,8 +1,21 @@
 # Building the Underwater Enhancer GUI Application
 
+## Prerequisites
+
+### All Platforms
+- Python 3.8 or higher
+- Git
+- 8GB RAM minimum (16GB recommended)
+- **CMake** (required for building gpr_tools)
+
+### Platform-Specific
+- **Windows**: Visual Studio 2019+ with C++ support (or Build Tools for Visual Studio)
+- **macOS**: Xcode Command Line Tools
+- **Linux**: build-essential package
+
 ## Quick Build
 
-### Local Build
+### Automated Build (Recommended)
 ```bash
 python build_scripts/build_app.py
 ```
@@ -20,7 +33,18 @@ This will:
 
 ## Manual Build Steps
 
-### 1. Compile GPR Tools (REQUIRED)
+### 1. Create Virtual Environment (Recommended)
+```bash
+python -m venv venv
+
+# Activate on Windows
+venv\Scripts\activate
+
+# Activate on macOS/Linux
+source venv/bin/activate
+```
+
+### 2. Compile GPR Tools (REQUIRED)
 ```bash
 # Unix/macOS
 chmod +x build_scripts/compile_gpr_tools.sh
@@ -30,12 +54,12 @@ chmod +x build_scripts/compile_gpr_tools.sh
 build_scripts\compile_gpr_tools.bat
 ```
 
-### 2. Install Dependencies
+### 3. Install Dependencies
 ```bash
 pip install -r requirements_gui.txt
 ```
 
-### 3. Build with PyInstaller
+### 4. Build with PyInstaller
 ```bash
 pyinstaller pyinstaller.spec --clean --noconfirm
 ```
@@ -80,12 +104,73 @@ The build process:
 
 **Note**: The application uses only the bundled binary - there is no fallback to system PATH. This ensures consistent behavior across all installations.
 
+## Development Setup (Running from Source)
+
+### 1. Clone Repository
+```bash
+git clone https://github.com/Seattle-Aquarium/auto-image-encoder.git
+cd auto-image-encoder
+```
+
+### 2. Create Virtual Environment
+```bash
+python -m venv venv
+source venv/bin/activate  # macOS/Linux
+# OR
+venv\Scripts\activate  # Windows
+```
+
+### 3. Install Dependencies
+```bash
+# For GUI application only
+pip install -r requirements_gui.txt
+
+# For full development (includes training, etc.)
+pip install -r requirements.txt
+```
+
+### 4. Install GPR Tools
+```bash
+# Automatic compilation
+chmod +x build_scripts/compile_gpr_tools.sh
+./build_scripts/compile_gpr_tools.sh
+
+# Or manually place gpr_tools binary in:
+# - Windows: binaries/win32/gpr_tools.exe
+# - macOS: binaries/darwin/gpr_tools
+# - Linux: binaries/linux/gpr_tools
+```
+
+### 5. Run Development Version
+```bash
+python app.py
+```
+
+## Testing the Build
+
+### Smoke Test
+```bash
+# Test that all modules load correctly
+./dist/UnderwaterEnhancer --smoke-test
+
+# Or set environment variable
+SMOKE_TEST=1 ./dist/UnderwaterEnhancer
+```
+
+### Manual Test
+1. Run the built application
+2. Load a model checkpoint file
+3. Process a test image
+4. Verify output quality
+
 ## Troubleshooting
 
-### Large Executable Size
-The executable is ~166MB due to bundled PyTorch and dependencies. This is normal.
+### Common Issues
 
-### Build Failures Due to GPR Tools
+**Large Executable Size**
+- The executable is ~166MB due to bundled PyTorch and dependencies. This is normal.
+
+**Build Failures Due to GPR Tools**
 If the build fails with "GPR tools binary not found":
 1. Ensure CMake is installed and in PATH
 2. For Windows: Ensure Visual Studio C++ build tools are installed
@@ -94,11 +179,73 @@ If the build fails with "GPR tools binary not found":
    - Windows: `build_scripts\compile_gpr_tools.bat`
    - Unix/macOS: `./build_scripts/compile_gpr_tools.sh`
 
-### Build Failures
+**Import Errors in Built App**
+- Ensure all dependencies are installed in the virtual environment
+- Check pyinstaller.spec hiddenimports section
+- Run with --debug flag for detailed output
+
+**GPR Files Not Working**
+- Verify gpr_tools binary is included in binaries/ folder
+- Check binary has execute permissions (macOS/Linux)
+- Ensure rawpy is installed for DNG processing
+
+**Build Failures**
 1. Check Python version (3.8+ required)
 2. Ensure all dependencies installed: `pip install -r requirements_gui.txt`
 3. Clean build directory: `rm -rf build dist`
 4. Try again with console mode: Edit `pyinstaller.spec`, set `console=True`
+
+**macOS Security Warnings**
+- Sign the app: `codesign --deep --force --sign - dist/UnderwaterEnhancer.app`
+- Clear quarantine: `xattr -cr dist/UnderwaterEnhancer.app`
+- Users may need to allow in System Preferences > Security & Privacy
+- See [MACOS_APP_INSTALLATION.md](MACOS_APP_INSTALLATION.md) for user instructions
+
+### Debug Mode
+```bash
+# Build with debug output
+pyinstaller pyinstaller.spec --debug all
+
+# Run with console window (Windows)
+pyinstaller pyinstaller.spec --console
+```
+
+### PyTorch Installation
+For CPU-only PyTorch (smaller download):
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+```
+
+## Packaging for Distribution
+
+### Windows
+1. Build with PyInstaller
+2. (Optional) Create installer with NSIS or Inno Setup
+3. Compress to ZIP for distribution
+
+### macOS
+1. Build with PyInstaller
+2. Sign the application (requires Apple Developer account for distribution)
+3. Create DMG:
+```bash
+# Install create-dmg
+brew install create-dmg
+
+# Create DMG
+create-dmg \
+  --volname "Underwater Enhancer" \
+  --window-size 600 400 \
+  --icon-size 100 \
+  --icon "UnderwaterEnhancer.app" 175 120 \
+  --app-drop-link 425 120 \
+  UnderwaterEnhancer.dmg \
+  dist/
+```
+
+### Linux
+1. Build with PyInstaller
+2. Create AppImage or .deb package (optional)
+3. Compress to tar.gz for distribution
 
 ## CI/CD with GitHub Actions
 
@@ -108,11 +255,39 @@ The `.github/workflows/build-gui.yml` workflow automatically:
 3. Validates the gpr_tools binary (size check)
 4. Bundles gpr_tools into the executable
 5. Creates platform-specific archives
-6. Uploads artifacts to GitHub
+6. Uploads artifacts to GitHub (available for 7 days)
 7. Creates releases when tagged
 
-To trigger a release:
+### CI/CD Features
+- ✅ Cross-platform builds (Windows, macOS, Linux)
+- ✅ Mandatory GPR tools compilation
+- ✅ CPU-only PyTorch for smaller artifacts
+- ✅ Build artifacts available for 7 days
+- ✅ Automatic release creation on version tags
+- ✅ Cached dependencies for faster builds
+
+### Triggering a Release
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+## Version Management
+
+1. Update version in `app.py`:
+```python
+__version__ = "0.1.0-beta"
+```
+
+2. Tag release in git:
+```bash
+git tag v0.1.0-beta
+git push origin v0.1.0-beta
+```
+
+3. Create GitHub release with built artifacts
+
+## Support
+
+For build issues, please open an issue at:
+https://github.com/Seattle-Aquarium/auto-image-encoder/issues
