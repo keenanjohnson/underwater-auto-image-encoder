@@ -142,7 +142,9 @@ Key settings:
 - **TPU Training** (optional): Install `pip install -r requirements-tpu.txt` for Google Cloud TPU support
   - Requires `torch-xla` and `cloud-tpu-client`
   - Recommended batch size: 128+ for optimal TPU utilization
-  - Automatically detected via `TPU_NAME` environment variable
+  - Auto-detects TPU via environment variables:
+    - Modern PJRT runtime: `PJRT_DEVICE=TPU` (recommended)
+    - Legacy XRT runtime: `XRT_TPU_CONFIG` or `TPU_NAME`
 
 ## Current Status (from TODO.md)
 - ✅ Dev environment setup

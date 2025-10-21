@@ -372,18 +372,30 @@ def main():
     np.random.seed(42)
 
     # Setup device (TPU > CUDA > MPS > CPU)
-    is_tpu = TPU_AVAILABLE and os.environ.get('TPU_NAME')
+    # TPU detection: Check for PJRT_DEVICE=TPU (new runtime) or XRT_TPU_CONFIG (legacy runtime)
+    is_tpu = False
+    if TPU_AVAILABLE:
+        # Modern PJRT runtime or legacy XRT runtime detection
+        tpu_env = os.environ.get('PJRT_DEVICE') == 'TPU' or \
+                  os.environ.get('XRT_TPU_CONFIG') is not None or \
+                  os.environ.get('TPU_NAME') is not None
+        if tpu_env:
+            try:
+                device = xm.xla_device()
+                is_tpu = True
+                logger.info(f"Using device: TPU")
+                logger.info(f"TPU device: {device}")
+                logger.info("Note: TPU training uses XLA compilation for optimal performance")
+                # Recommend larger batch sizes for TPU
+                if args.batch_size < 64:
+                    logger.warning(f"TPU works best with batch sizes >= 64 (current: {args.batch_size})")
+                    logger.warning("Consider using --batch-size 128 or higher for better TPU utilization")
+            except Exception as e:
+                logger.warning(f"TPU environment detected but initialization failed: {e}")
+                logger.warning("Falling back to CUDA/MPS/CPU")
+                is_tpu = False
 
-    if is_tpu:
-        device = xm.xla_device()
-        logger.info(f"Using device: TPU")
-        logger.info(f"TPU device: {device}")
-        logger.info("Note: TPU training uses XLA compilation for optimal performance")
-        # Recommend larger batch sizes for TPU
-        if args.batch_size < 64:
-            logger.warning(f"TPU works best with batch sizes >= 64 (current: {args.batch_size})")
-            logger.warning("Consider using --batch-size 128 or higher for better TPU utilization")
-    elif torch.cuda.is_available():
+    if not is_tpu and torch.cuda.is_available():
         device = torch.device('cuda')
         gpu_name = torch.cuda.get_device_name(0)
         gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
