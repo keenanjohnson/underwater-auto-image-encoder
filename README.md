@@ -88,6 +88,39 @@ pip install -r requirements.txt
 python -c "from preprocess_images import GPRPreprocessor; print('✓ Setup complete')"
 ```
 
+### Download Pre-prepared Dataset from Hugging Face
+
+If you're working on a remote VM or want to use a pre-prepared dataset, you can download it directly from Hugging Face:
+
+```bash
+# Install huggingface_hub (included in requirements.txt)
+pip install huggingface_hub
+
+# Download the dataset (downloads to ./dataset by default)
+python download_dataset.py
+
+# Download to a custom directory
+python download_dataset.py --output my_dataset
+
+# Download a different dataset
+python download_dataset.py --repo-id username/dataset-name
+```
+
+The script downloads the dataset with the correct structure:
+```
+dataset/
+├── input/   # Raw/input images
+└── target/  # Enhanced/target images
+```
+
+**For private datasets**, authenticate first:
+```bash
+huggingface-cli login
+python download_dataset.py --repo-id username/private-dataset
+```
+
+After downloading, you can skip directly to training (step 3 below).
+
 ### Usage Pipeline
 
 #### 1. Preprocess GPR Files

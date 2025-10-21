@@ -34,6 +34,7 @@ tqdm>=4.65.0
 # File handling
 ExifRead>=3.0.0
 pyexiv2>=2.8.0
+huggingface_hub>=0.20.0
 
 # GUI
 customtkinter>=5.2.2
