@@ -573,7 +573,8 @@ def main():
         }
 
         # Save latest checkpoint (only on master for TPU, or always for GPU/CPU)
-        if not is_tpu or xm.is_master_ordinal():
+        should_save = not is_tpu or (TPU_AVAILABLE and xm.is_master_ordinal())
+        if should_save:
             latest_checkpoint = checkpoint_dir / 'latest_checkpoint.pth'
             torch.save(checkpoint, latest_checkpoint)
 
@@ -589,7 +590,8 @@ def main():
             }
 
             # Save only on master for TPU, or always for GPU/CPU
-            if not is_tpu or xm.is_master_ordinal():
+            should_save = not is_tpu or (TPU_AVAILABLE and xm.is_master_ordinal())
+            if should_save:
                 best_model_path = output_dir / 'best_model.pth'
                 torch.save(checkpoint, best_model_path)
                 logger.info(f"✓ Saved best model: {best_model_path}")
@@ -601,7 +603,8 @@ def main():
         # Periodic checkpoint
         if (epoch + 1) % 5 == 0:
             # Save only on master for TPU, or always for GPU/CPU
-            if not is_tpu or xm.is_master_ordinal():
+            should_save = not is_tpu or (TPU_AVAILABLE and xm.is_master_ordinal())
+            if should_save:
                 periodic_checkpoint = checkpoint_dir / f'checkpoint_epoch_{epoch+1}.pth'
                 torch.save(checkpoint, periodic_checkpoint)
                 logger.info(f"✓ Saved periodic checkpoint: {periodic_checkpoint}")
@@ -612,7 +615,8 @@ def main():
             break
 
     # Save final model (only on master for TPU, or always for GPU/CPU)
-    if not is_tpu or xm.is_master_ordinal():
+    should_save = not is_tpu or (TPU_AVAILABLE and xm.is_master_ordinal())
+    if should_save:
         final_model_path = output_dir / 'final_model.pth'
         final_checkpoint = {
             'model_state_dict': model.state_dict(),
