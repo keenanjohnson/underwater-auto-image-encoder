@@ -284,11 +284,11 @@ def train_epoch(model, dataloader, criterion, optimizer, device, is_tpu=False):
             loss = criterion(outputs, targets)
             loss.backward()
 
-            # Use TPU-specific optimizer step if on TPU
+            optimizer.step()
+
+            # Synchronize TPU operations
             if is_tpu:
-                xm.optimizer_step(optimizer)
-            else:
-                optimizer.step()
+                xm.mark_step()
 
             batch_loss = loss.item()
             batch_psnr = calculate_psnr(outputs, targets).item()
