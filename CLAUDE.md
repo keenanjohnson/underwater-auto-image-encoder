@@ -34,11 +34,17 @@ python create_subset.py --input-dir dataset --output-dir dataset_subset --num-sa
 
 ### Training
 ```bash
-# Local training with U-Net (auto-detects GPU/CPU)
-python train.py
+# Local training with U-Net (auto-detects TPU/GPU/CPU)
+python train.py --input-dir dataset/input_GPR --target-dir dataset/human_output_JPEG
 
 # Resume training from checkpoint
-python train.py --resume checkpoints/checkpoint_epoch_10.pth
+python train.py --input-dir dataset/input_GPR --target-dir dataset/human_output_JPEG \
+  --resume checkpoints/checkpoint_epoch_10.pth
+
+# Training on Google Cloud TPU (requires requirements-tpu.txt)
+# Recommended batch size: 128+ for optimal TPU utilization
+python train.py --input-dir dataset/input_GPR --target-dir dataset/human_output_JPEG \
+  --batch-size 128 --image-size 1024
 
 # Monitor training progress
 tensorboard --logdir logs
@@ -132,7 +138,11 @@ Key settings:
 ## External Dependencies
 - **GPR Tools**: Install via `./build_scripts/compile_gpr_tools.sh` or build from https://github.com/keenanjohnson/gpr_tools (fork with MSVC fixes)
 - **Python 3.8+** with PyTorch, OpenCV, scikit-image
-- **CUDA GPU** recommended (auto-fallback to CPU)
+- **Hardware**: Auto-detects TPU > CUDA GPU > Apple Silicon (MPS) > CPU
+- **TPU Training** (optional): Install `pip install -r requirements-tpu.txt` for Google Cloud TPU support
+  - Requires `torch-xla` and `cloud-tpu-client`
+  - Recommended batch size: 128+ for optimal TPU utilization
+  - Automatically detected via `TPU_NAME` environment variable
 
 ## Current Status (from TODO.md)
 - ✅ Dev environment setup

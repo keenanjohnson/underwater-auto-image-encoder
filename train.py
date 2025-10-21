@@ -20,6 +20,14 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
+# TPU support (optional - only imported if running on TPU)
+try:
+    import torch_xla.core.xla_model as xm
+    import torch_xla.distributed.parallel_loader as pl
+    TPU_AVAILABLE = True
+except ImportError:
+    TPU_AVAILABLE = False
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -260,7 +268,7 @@ def load_split(split_file, num_files):
         return train_indices, val_indices
 
 
-def train_epoch(model, dataloader, criterion, optimizer, device):
+def train_epoch(model, dataloader, criterion, optimizer, device, is_tpu=False):
     """Train for one epoch"""
     model.train()
     total_loss = 0.0
@@ -275,7 +283,12 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
             outputs = model(inputs)
             loss = criterion(outputs, targets)
             loss.backward()
-            optimizer.step()
+
+            # Use TPU-specific optimizer step if on TPU
+            if is_tpu:
+                xm.optimizer_step(optimizer)
+            else:
+                optimizer.step()
 
             batch_loss = loss.item()
             batch_psnr = calculate_psnr(outputs, targets).item()
@@ -291,7 +304,7 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
     return total_loss / num_batches, total_psnr / num_batches
 
 
-def validate_epoch(model, dataloader, criterion, device):
+def validate_epoch(model, dataloader, criterion, device, is_tpu=False):
     """Validate for one epoch"""
     model.eval()
     total_loss = 0.0
@@ -316,6 +329,10 @@ def validate_epoch(model, dataloader, criterion, device):
                     'Loss': f'{batch_loss:.4f}',
                     'PSNR': f'{batch_psnr:.2f} dB'
                 })
+
+    # Synchronize TPU after validation
+    if is_tpu:
+        xm.mark_step()
 
     return total_loss / num_batches, total_psnr / num_batches
 
@@ -354,8 +371,19 @@ def main():
     torch.manual_seed(42)
     np.random.seed(42)
 
-    # Setup device (CUDA > MPS > CPU)
-    if torch.cuda.is_available():
+    # Setup device (TPU > CUDA > MPS > CPU)
+    is_tpu = TPU_AVAILABLE and os.environ.get('TPU_NAME')
+
+    if is_tpu:
+        device = xm.xla_device()
+        logger.info(f"Using device: TPU")
+        logger.info(f"TPU device: {device}")
+        logger.info("Note: TPU training uses XLA compilation for optimal performance")
+        # Recommend larger batch sizes for TPU
+        if args.batch_size < 64:
+            logger.warning(f"TPU works best with batch sizes >= 64 (current: {args.batch_size})")
+            logger.warning("Consider using --batch-size 128 or higher for better TPU utilization")
+    elif torch.cuda.is_available():
         device = torch.device('cuda')
         gpu_name = torch.cuda.get_device_name(0)
         gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
@@ -415,7 +443,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
-        pin_memory=True
+        pin_memory=True and not is_tpu  # TPU doesn't use pinned memory
     )
 
     val_loader = DataLoader(
@@ -423,8 +451,14 @@ def main():
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        pin_memory=True
+        pin_memory=True and not is_tpu  # TPU doesn't use pinned memory
     )
+
+    # Wrap dataloaders for TPU
+    if is_tpu:
+        logger.info("Wrapping dataloaders with TPU ParallelLoader...")
+        train_loader = pl.ParallelLoader(train_loader, [device]).per_device_loader(device)
+        val_loader = pl.ParallelLoader(val_loader, [device]).per_device_loader(device)
 
     # Test memory with one batch
     logger.info("Testing memory with sample batch...")
@@ -433,12 +467,16 @@ def main():
         sample_inputs = sample_batch[0].to(device)
         logger.info(f"Batch shape: {sample_inputs.shape}")
 
-        if torch.cuda.is_available():
+        if is_tpu:
+            # Synchronize TPU to ensure data is loaded
+            xm.mark_step()
+            logger.info("TPU memory is managed automatically by XLA runtime")
+        elif torch.cuda.is_available():
             memory_used = torch.cuda.max_memory_allocated() / 1e9
             logger.info(f"Memory for data batch: {memory_used:.2f} GB")
     except Exception as e:
         logger.error(f"Memory test failed: {e}")
-        logger.error("Batch size may be too large for available GPU memory")
+        logger.error("Batch size may be too large for available memory")
         return
 
     # Create model
@@ -488,12 +526,12 @@ def main():
         logger.info("-" * 80)
 
         # Train
-        train_loss, train_psnr = train_epoch(model, train_loader, criterion, optimizer, device)
+        train_loss, train_psnr = train_epoch(model, train_loader, criterion, optimizer, device, is_tpu)
         train_losses.append(train_loss)
         train_psnrs.append(train_psnr)
 
         # Validate
-        val_loss, val_psnr = validate_epoch(model, val_loader, criterion, device)
+        val_loss, val_psnr = validate_epoch(model, val_loader, criterion, device, is_tpu)
         val_losses.append(val_loss)
         val_psnrs.append(val_psnr)
 
@@ -522,14 +560,14 @@ def main():
             }
         }
 
-        # Save latest checkpoint
-        latest_checkpoint = checkpoint_dir / 'latest_checkpoint.pth'
-        torch.save(checkpoint, latest_checkpoint)
+        # Save latest checkpoint (only on master for TPU, or always for GPU/CPU)
+        if not is_tpu or xm.is_master_ordinal():
+            latest_checkpoint = checkpoint_dir / 'latest_checkpoint.pth'
+            torch.save(checkpoint, latest_checkpoint)
 
         # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            best_model_path = output_dir / 'best_model.pth'
 
             # Add model config for inference
             checkpoint['model_config'] = {
@@ -538,45 +576,52 @@ def main():
                 'image_size': image_size if image_size is not None else 4606,
             }
 
-            torch.save(checkpoint, best_model_path)
-            logger.info(f"✓ Saved best model: {best_model_path}")
+            # Save only on master for TPU, or always for GPU/CPU
+            if not is_tpu or xm.is_master_ordinal():
+                best_model_path = output_dir / 'best_model.pth'
+                torch.save(checkpoint, best_model_path)
+                logger.info(f"✓ Saved best model: {best_model_path}")
+
             patience_counter = 0
         else:
             patience_counter += 1
 
         # Periodic checkpoint
         if (epoch + 1) % 5 == 0:
-            periodic_checkpoint = checkpoint_dir / f'checkpoint_epoch_{epoch+1}.pth'
-            torch.save(checkpoint, periodic_checkpoint)
-            logger.info(f"✓ Saved periodic checkpoint: {periodic_checkpoint}")
+            # Save only on master for TPU, or always for GPU/CPU
+            if not is_tpu or xm.is_master_ordinal():
+                periodic_checkpoint = checkpoint_dir / f'checkpoint_epoch_{epoch+1}.pth'
+                torch.save(checkpoint, periodic_checkpoint)
+                logger.info(f"✓ Saved periodic checkpoint: {periodic_checkpoint}")
 
         # Early stopping
         if patience_counter >= args.patience:
             logger.info(f"Early stopping triggered after {epoch+1} epochs")
             break
 
-    # Save final model
-    final_model_path = output_dir / 'final_model.pth'
-    final_checkpoint = {
-        'model_state_dict': model.state_dict(),
-        'model_config': {
-            'n_channels': 3,
-            'n_classes': 3,
-            'image_size': image_size if image_size is not None else 4606,
-        },
-        'training_history': {
-            'train_losses': train_losses,
-            'val_losses': val_losses,
-            'train_psnrs': train_psnrs,
-            'val_psnrs': val_psnrs,
-        },
-        'training_config': {
-            'resolution': resolution_str,
-            'batch_size': args.batch_size,
-            'epochs': len(train_losses),
+    # Save final model (only on master for TPU, or always for GPU/CPU)
+    if not is_tpu or xm.is_master_ordinal():
+        final_model_path = output_dir / 'final_model.pth'
+        final_checkpoint = {
+            'model_state_dict': model.state_dict(),
+            'model_config': {
+                'n_channels': 3,
+                'n_classes': 3,
+                'image_size': image_size if image_size is not None else 4606,
+            },
+            'training_history': {
+                'train_losses': train_losses,
+                'val_losses': val_losses,
+                'train_psnrs': train_psnrs,
+                'val_psnrs': val_psnrs,
+            },
+            'training_config': {
+                'resolution': resolution_str,
+                'batch_size': args.batch_size,
+                'epochs': len(train_losses),
+            }
         }
-    }
-    torch.save(final_checkpoint, final_model_path)
+        torch.save(final_checkpoint, final_model_path)
 
     logger.info("\n" + "=" * 80)
     logger.info("✓ Training complete!")

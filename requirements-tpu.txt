@@ -1,0 +1,11 @@
+# TPU-specific dependencies for Google Cloud TPU training
+# Install these ONLY if training on TPU VMs
+# Installation: pip install -r requirements-tpu.txt
+
+# TPU support (must match your PyTorch version)
+torch-xla>=2.0.0
+cloud-tpu-client>=0.10
+
+# Note: Install this AFTER installing base requirements.txt
+# The torch-xla version must match your PyTorch version
+# For specific version matching, see: https://github.com/pytorch/xla#-available-docker-images-and-wheels
