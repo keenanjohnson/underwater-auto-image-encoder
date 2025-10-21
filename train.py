@@ -450,12 +450,15 @@ def main():
     logger.info(f"Validation samples: {len(val_dataset)}")
 
     # Create dataloaders
+    # Only use pinned memory for CUDA (not TPU, not CPU, not MPS)
+    use_pin_memory = torch.cuda.is_available() and not is_tpu
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
-        pin_memory=True and not is_tpu  # TPU doesn't use pinned memory
+        pin_memory=use_pin_memory
     )
 
     val_loader = DataLoader(
@@ -463,7 +466,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        pin_memory=True and not is_tpu  # TPU doesn't use pinned memory
+        pin_memory=use_pin_memory
     )
 
     # Wrap dataloaders for TPU
