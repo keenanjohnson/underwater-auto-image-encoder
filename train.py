@@ -468,9 +468,9 @@ def main():
 
     # Wrap dataloaders for TPU
     if is_tpu:
-        logger.info("Wrapping dataloaders with TPU ParallelLoader...")
-        train_loader = pl.ParallelLoader(train_loader, [device]).per_device_loader(device)
-        val_loader = pl.ParallelLoader(val_loader, [device]).per_device_loader(device)
+        logger.info("Wrapping dataloaders with TPU MpDeviceLoader...")
+        train_loader = pl.MpDeviceLoader(train_loader, device)
+        val_loader = pl.MpDeviceLoader(val_loader, device)
 
     # Test memory with one batch
     logger.info("Testing memory with sample batch...")
