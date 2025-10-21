@@ -35,10 +35,10 @@ python create_subset.py --input-dir dataset --output-dir dataset_subset --num-sa
 ### Training
 ```bash
 # Local training with U-Net (auto-detects GPU/CPU)
-python train_unet.py
+python train.py
 
 # Resume training from checkpoint
-python train_unet.py --resume checkpoints/checkpoint_epoch_10.pth
+python train.py --resume checkpoints/checkpoint_epoch_10.pth
 
 # Monitor training progress
 tensorboard --logdir logs
@@ -93,7 +93,7 @@ Located in `src/models/unet_autoencoder.py`:
    - Creates train/val splits (80/20)
    - Handles file naming consistency
 
-3. **Training Loop** (`train_unet.py`):
+3. **Training Loop** (`train.py`):
    - Loads config from `config.yaml`
    - Implements early stopping, learning rate scheduling
    - Saves best model based on validation loss
