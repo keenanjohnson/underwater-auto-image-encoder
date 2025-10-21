@@ -72,7 +72,7 @@ For detailed GUI documentation, see [GUI_README.md](GUI_README.md).
 
 ### Prerequisites
 - Python 3.8+
-- CUDA-compatible GPU (recommended)
+- Hardware: TPU / CUDA GPU / Apple Silicon / CPU (auto-detected)
 - GoPro GPR tools (automatically installed in dev container)
 
 ### Installation
@@ -81,8 +81,11 @@ For detailed GUI documentation, see [GUI_README.md](GUI_README.md).
 git clone <repository-url>
 cd auto-image-encoder
 
-# Install dependencies
+# Install core dependencies
 pip install -r requirements.txt
+
+# Optional: Install TPU support for Google Cloud TPU training
+pip install -r requirements-tpu.txt
 
 # Verify GPR tools installation
 python -c "from preprocess_images import GPRPreprocessor; print('✓ Setup complete')"
@@ -146,16 +149,43 @@ python ./prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jp
 
 #### 3. Train the Model
 
+The training script automatically detects the best available hardware (TPU > CUDA GPU > Apple Silicon > CPU).
+
+**Local Training (GPU/CPU/Apple Silicon):**
 ```bash
-# Train with standard U-Net (auto-detects GPU/CPU)
-python train.py
+# Train with standard U-Net (auto-detects hardware)
+python train.py --input-dir dataset/input --target-dir dataset/target
 
 # Resume from checkpoint
-python train.py --resume checkpoints/checkpoint_epoch_10.pth
+python train.py --input-dir dataset/input --target-dir dataset/target \
+  --resume checkpoints/checkpoint_epoch_10.pth
 
 # Monitor progress
 tensorboard --logdir logs
 ```
+
+**Google Cloud TPU Training:**
+
+For significantly faster training on Google Cloud TPUs:
+
+```bash
+# 1. Install TPU dependencies (one-time setup)
+pip install -r requirements-tpu.txt
+
+# 2. Train with TPU-optimized settings
+# Recommended: Use larger batch sizes (128+) for optimal TPU utilization
+python train.py --input-dir dataset/input --target-dir dataset/target \
+  --batch-size 128 --image-size 1024
+
+# The script automatically detects TPU via the TPU_NAME environment variable
+# (usually set automatically on TPU VMs)
+```
+
+**TPU Training Notes:**
+- TPU support requires `torch-xla` and `cloud-tpu-client` (install via `requirements-tpu.txt`)
+- Recommended batch size: 128 or higher for optimal TPU utilization
+- TPU is automatically detected via the `TPU_NAME` environment variable
+- Training is significantly faster on TPUs compared to GPUs for large batch sizes
 
 For detailed training options and Google Colab setup, see [TRAINING.md](TRAINING.md).
 
@@ -212,11 +242,17 @@ The model uses a standard U-Net architecture trained on paired raw/enhanced unde
 
 **Quick start:**
 ```bash
-python train.py
+# Local training (auto-detects best hardware)
+python train.py --input-dir dataset/input --target-dir dataset/target
+
+# Google Cloud TPU (requires requirements-tpu.txt)
+python train.py --input-dir dataset/input --target-dir dataset/target \
+  --batch-size 128 --image-size 1024
 ```
 
 **Key features:**
-- Auto-detects GPU/CPU
+- Auto-detects hardware: TPU > CUDA GPU > Apple Silicon (MPS) > CPU
+- TPU support for significantly faster training (requires `requirements-tpu.txt`)
 - Early stopping and learning rate scheduling
 - Validation comparisons every 5 epochs
 - Google Colab notebook available for free GPU training
@@ -233,13 +269,14 @@ auto-image-encoder/
 ├── photos/                         # Full dataset (3414 image pairs)
 │   ├── input_GPR/                  # All GPR input images
 │   └── human_output_JPEG/          # All manually edited images
-├── train.py                        # Local training script (Standard U-Net)
+├── train.py                        # Local training script (TPU/GPU/CPU auto-detect)
 ├── train_underwater_enhancer_colab.ipynb  # Google Colab notebook
 ├── inference.py                    # Inference script with tiled processing
 ├── denoise_tiff.py                # Post-processing denoising script
 ├── create_subset.py                # Dataset subset creation script
 ├── config.yaml                     # Training configuration
-└── requirements.txt                # Python dependencies
+├── requirements.txt                # Core Python dependencies
+└── requirements-tpu.txt            # Optional: TPU training dependencies
 ```
 
 ## ⚙️ Configuration

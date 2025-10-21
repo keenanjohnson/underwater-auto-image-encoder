@@ -12,8 +12,8 @@ The `train.py` script provides a command-line interface for training the underwa
 
 ```bash
 python train.py \
-  --input-dir dataset/input_GPR \
-  --target-dir dataset/human_output_JPEG \
+  --input-dir dataset/input \
+  --target-dir dataset/target \
   --image-size 1024 \
   --batch-size 16 \
   --epochs 50
