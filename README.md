@@ -148,12 +148,17 @@ python prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg
 
 **Option B: From Hugging Face dataset (paired .tif and .jpg in same directory)**
 ```bash
+# Step 1: Crop images to standard dimensions (4606×4030)
+# This ensures all images are the correct size for training
+python crop_tiff.py my_dataset/ --output-dir my_dataset_cropped --preserve-format
+
+# Step 2: Organize into training structure
 # If you have a dataset where input (.tif) and output (.jpg) files
 # are in the same directory with matching filenames
-python prepare_huggingface_dataset.py my_dataset/ --output dataset_hf
+python prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf
 
 # Use --symlink to save disk space (creates symbolic links instead of copying)
-python prepare_huggingface_dataset.py my_dataset/ --output dataset_hf --symlink
+python prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf --symlink
 
 # Creates the same organized structure:
 # dataset_hf/input/   - Raw images (.tif files)
@@ -267,6 +272,7 @@ auto-image-encoder/
 ├── train_underwater_enhancer_colab.ipynb  # Google Colab notebook
 ├── inference.py                    # Inference script with tiled processing
 ├── preprocess_images.py            # GPR preprocessing script
+├── crop_tiff.py                    # Crop TIFF/JPEG/PNG images to standard dimensions
 ├── prepare_dataset.py              # Dataset preparation (from separate dirs)
 ├── prepare_huggingface_dataset.py  # Dataset preparation (from Hugging Face format)
 ├── download_dataset.py             # Download datasets from Hugging Face
