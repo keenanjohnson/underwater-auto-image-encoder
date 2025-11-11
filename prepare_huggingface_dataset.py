@@ -56,10 +56,16 @@ def prepare_paired_dataset(source_dir: str, output_dir: str = "dataset", symlink
 
     for tif_file in tif_files:
         base_name = tif_file.stem
-        jpg_file = source_path / f"{base_name}.jpg"
+        # Check for multiple possible output extensions
+        found_target = None
+        for ext in [".jpg", ".JPG", ".jpeg", ".JPEG"]:
+            candidate = source_path / f"{base_name}{ext}"
+            if candidate.exists():
+                found_target = candidate
+                break
 
-        if jpg_file.exists():
-            pairs.append((tif_file, jpg_file))
+        if found_target:
+            pairs.append((tif_file, found_target))
         else:
             missing_targets.append(tif_file.name)
 
