@@ -105,6 +105,7 @@ def prepare_paired_dataset(source_dir: str, output_dir: str = "dataset", symlink
     logger.info("Creating train/validation split (80/20)...")
 
     num_pairs = len(pairs)
+    np.random.seed(42)
     indices = np.random.permutation(num_pairs)
     split_point = int(0.8 * num_pairs)
 
