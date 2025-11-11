@@ -27,6 +27,12 @@ def prepare_paired_dataset(source_dir: str, output_dir: str = "dataset", symlink
         symlink: Create symlinks instead of copying files
     """
     source_path = Path(source_dir)
+    if not source_path.exists():
+        logger.error(f"Source directory does not exist: {source_dir}")
+        return
+    if not source_path.is_dir():
+        logger.error(f"Source path is not a directory: {source_dir}")
+        return
     output_path = Path(output_dir)
 
     input_dir = output_path / "input"
