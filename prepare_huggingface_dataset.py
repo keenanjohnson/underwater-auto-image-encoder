@@ -42,7 +42,7 @@ def prepare_paired_dataset(source_dir: str, output_dir: str = "dataset", symlink
     target_dir.mkdir(parents=True, exist_ok=True)
 
     # Find all .tif files (inputs)
-    tif_files = sorted(source_path.glob("*.tif"))
+    tif_files = sorted(list(source_path.glob("*.tif")) + list(source_path.glob("*.TIF")))
 
     if not tif_files:
         logger.error(f"No .tif files found in {source_dir}")
