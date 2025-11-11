@@ -134,9 +134,11 @@ python preprocess_images.py /path/to/gpr/files --output-dir processed
 ```
 
 #### 2. Prepare Training Dataset
+
+**Option A: From preprocessed GPR files**
 ```bash
 # Organize paired raw/enhanced images for training
-python ./prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
+python prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
 
 # Creates organized dataset structure:
 # dataset/input/   - Raw images (renamed consistently)
@@ -144,14 +146,41 @@ python ./prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jp
 # dataset/split.txt - Train/validation split
 ```
 
+**Option B: From Hugging Face dataset (paired .tif and .jpg in same directory)**
+```bash
+# If you have a dataset where input (.tif) and output (.jpg) files
+# are in the same directory with matching filenames
+python prepare_huggingface_dataset.py my_dataset/ --output dataset_hf
+
+# Use --symlink to save disk space (creates symbolic links instead of copying)
+python prepare_huggingface_dataset.py my_dataset/ --output dataset_hf --symlink
+
+# Creates the same organized structure:
+# dataset_hf/input/   - Raw images (.tif files)
+# dataset_hf/target/  - Enhanced images (.jpg files)
+# dataset_hf/split.txt - Train/validation split
+```
+
 #### 3. Train the Model
 
 ```bash
 # Train with standard U-Net (auto-detects GPU/CPU)
-python train.py
+# Must specify --input-dir and --target-dir
+python train.py --input-dir dataset/input --target-dir dataset/target
+
+# With custom settings
+python train.py \
+  --input-dir dataset/input \
+  --target-dir dataset/target \
+  --image-size 512 \
+  --batch-size 8 \
+  --epochs 50
 
 # Resume from checkpoint
-python train.py --resume checkpoints/checkpoint_epoch_10.pth
+python train.py \
+  --input-dir dataset/input \
+  --target-dir dataset/target \
+  --resume checkpoints/latest_checkpoint.pth
 
 # Monitor progress
 tensorboard --logdir logs
@@ -227,16 +256,21 @@ For complete training documentation, command-line options, and hardware requirem
 
 ```
 auto-image-encoder/
-├── dataset/                        # Training dataset (1000 image pairs)
-│   ├── input_GPR/                  # Raw GPR input images
-│   └── human_output_JPEG/          # Manually edited target images
+├── dataset/                        # Training dataset (organized structure)
+│   ├── input/                      # Raw/input images
+│   ├── target/                     # Enhanced/target images
+│   └── split.txt                   # Train/validation split indices
 ├── photos/                         # Full dataset (3414 image pairs)
 │   ├── input_GPR/                  # All GPR input images
 │   └── human_output_JPEG/          # All manually edited images
 ├── train.py                        # Local training script (Standard U-Net)
 ├── train_underwater_enhancer_colab.ipynb  # Google Colab notebook
 ├── inference.py                    # Inference script with tiled processing
-├── denoise_tiff.py                # Post-processing denoising script
+├── preprocess_images.py            # GPR preprocessing script
+├── prepare_dataset.py              # Dataset preparation (from separate dirs)
+├── prepare_huggingface_dataset.py  # Dataset preparation (from Hugging Face format)
+├── download_dataset.py             # Download datasets from Hugging Face
+├── denoise_tiff.py                 # Post-processing denoising script
 ├── create_subset.py                # Dataset subset creation script
 ├── config.yaml                     # Training configuration
 └── requirements.txt                # Python dependencies
