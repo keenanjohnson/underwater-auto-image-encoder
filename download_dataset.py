@@ -17,9 +17,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Default dataset repository
+DEFAULT_REPO_ID = "Seattle-Aquarium/Seattle_Aquarium_benthic_imagery"
+
 
 def download_dataset(
-    repo_id: str = "keenanj/test-images",
+    repo_id: str = DEFAULT_REPO_ID,
     output_dir: str = "dataset",
     repo_type: str = "dataset"
 ):
@@ -27,7 +30,7 @@ def download_dataset(
     Download dataset from Hugging Face Hub
 
     Args:
-        repo_id: Hugging Face repository ID (e.g., 'keenanj/test-images')
+        repo_id: Hugging Face repository ID (default: DEFAULT_REPO_ID)
         output_dir: Local directory to save the dataset
         repo_type: Type of repository ('dataset', 'model', or 'space')
     """
@@ -103,8 +106,8 @@ Examples:
     parser.add_argument(
         '--repo-id',
         type=str,
-        default='keenanj/test-images',
-        help='Hugging Face repository ID (default: keenanj/test-images)'
+        default=DEFAULT_REPO_ID,
+        help=f'Hugging Face repository ID (default: {DEFAULT_REPO_ID})'
     )
 
     parser.add_argument(

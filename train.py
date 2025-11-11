@@ -410,12 +410,15 @@ def main():
     logger.info(f"Validation samples: {len(val_dataset)}")
 
     # Create dataloaders
+    # Disable pin_memory for MPS (not supported yet)
+    use_pin_memory = device.type == 'cuda'
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
-        pin_memory=True
+        pin_memory=use_pin_memory
     )
 
     val_loader = DataLoader(
@@ -423,7 +426,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        pin_memory=True
+        pin_memory=use_pin_memory
     )
 
     # Test memory with one batch
