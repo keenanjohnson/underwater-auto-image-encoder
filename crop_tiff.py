@@ -7,7 +7,7 @@ Useful for preprocessing Hugging Face datasets to match training dimensions
 import argparse
 import logging
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 from PIL import Image
 from tqdm import tqdm
 
