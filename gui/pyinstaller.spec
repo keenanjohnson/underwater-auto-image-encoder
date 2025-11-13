@@ -8,23 +8,19 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 # Ensure src is importable
 # When running "pyinstaller gui/pyinstaller.spec" from project root:
-# - SPECPATH contains the path to this spec file
-# - We need to get to the project root directory
+# - SPECPATH is set by PyInstaller to the DIRECTORY containing the spec file
+# - We need to get to the project root directory (one level up from SPECPATH)
 #
-# IMPORTANT: Don't use os.getcwd() or os.path.abspath() as PyInstaller may change
-# the working directory. Use __file__ instead which is always absolute.
+# IMPORTANT: SPECPATH is the directory path, not the file path!
 print(f"\nDEBUG: SPECPATH = {SPECPATH}")
-print(f"DEBUG: __file__ = {__file__}")
 print(f"DEBUG: os.getcwd() = {os.getcwd()}")
 
-# Use __file__ which PyInstaller sets to the absolute path of this spec file
-spec_file_path = os.path.abspath(__file__)
-print(f"DEBUG: spec_file_path (absolute from __file__) = {spec_file_path}")
-
-spec_file_dir = os.path.dirname(spec_file_path)  # .../gui
+# SPECPATH is already the directory containing this spec file (.../gui)
+spec_file_dir = SPECPATH
 print(f"DEBUG: spec_file_dir = {spec_file_dir}")
 
-spec_dir = os.path.dirname(spec_file_dir)  # .../ (project root)
+# Go up one level to get project root
+spec_dir = os.path.dirname(spec_file_dir)
 print(f"DEBUG: spec_dir (project root) = {spec_dir}")
 
 sys.path.insert(0, spec_dir)
