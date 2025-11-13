@@ -3,7 +3,7 @@
 
 # Dataset Download Configuration
 download:
-  repo_id: "keenanj/small-test"
+  repo_id: "Seattle-Aquarium/Seattle_Aquarium_benthic_imagery"
   dataset_dir: "dataset_raw"  # Directory to download/store raw dataset
 
 # Dataset Preparation Configuration
