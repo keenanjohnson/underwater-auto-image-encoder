@@ -206,9 +206,9 @@ def create_icns_file(img, output_path):
         'icon_512x512': 512,
         'icon_512x512@2x': 1024,
     }
-    
-    # Create temporary directory for icon files
-    temp_dir = Path('temp_icns')
+
+    # Create temporary directory for icon files (in project root)
+    temp_dir = Path(__file__).parent.parent / 'temp_icns'
     temp_dir.mkdir(exist_ok=True)
     
     iconset_dir = temp_dir / 'icon.iconset'
@@ -245,8 +245,9 @@ def create_icns_file(img, output_path):
         shutil.rmtree(temp_dir)
 
 def main():
-    # Ensure assets directory exists
-    assets_dir = Path('assets')
+    # Ensure assets directory exists (relative to project root)
+    script_dir = Path(__file__).parent
+    assets_dir = script_dir.parent / 'assets'
     assets_dir.mkdir(exist_ok=True)
     
     # Create the main icon at high resolution

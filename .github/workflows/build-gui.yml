@@ -262,7 +262,7 @@ jobs:
     - name: Build with PyInstaller
       run: |
         echo "Building universal GPU/CPU executable..."
-        pyinstaller pyinstaller.spec --clean --noconfirm
+        pyinstaller gui/pyinstaller.spec --clean --noconfirm
         echo "Built universal GPU/CPU executable"
       shell: bash
     
