@@ -21,6 +21,26 @@ python preprocess_images.py /path/to/gpr/files --output-dir processed
 ```
 
 ### Dataset Preparation
+
+#### From Hugging Face (Set-Based Structure)
+```bash
+# First-time: Authenticate to avoid rate limits
+huggingface-cli login
+
+# Download dataset from Hugging Face
+python download_dataset.py --output dataset_raw
+
+# Prepare all sets for training
+python prepare_huggingface_dataset.py dataset_raw --output training_dataset
+
+# Prepare specific sets only
+python prepare_huggingface_dataset.py dataset_raw/set01 dataset_raw/set02 --output training_dataset
+
+# Use symlinks to save disk space
+python prepare_huggingface_dataset.py dataset_raw --output training_dataset --symlink
+```
+
+#### From Local Files
 ```bash
 # Fast dataset preparation (recommended)
 python prepare_dataset_fast.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
@@ -111,6 +131,25 @@ Located in `src/models/unet_autoencoder.py`:
 - **Combined loss**: Balances sharpness (L1) with smooth gradients (MSE)
 
 ## Dataset Structure
+
+### Hugging Face Dataset Structure (New Format)
+```
+dataset_raw/           # Downloaded from HuggingFace
+├── set01/
+│   ├── input/        # Raw images for set 1
+│   └── output/       # Enhanced targets for set 1
+├── set02/
+│   ├── input/
+│   └── output/
+└── ...
+
+training_dataset/     # Prepared for training (after running prepare_hf_set_dataset.py)
+├── input/           # Combined inputs from all sets
+├── target/          # Combined targets from all sets
+└── split.txt        # Train/val split indices
+```
+
+### Legacy Local Dataset Structure
 ```
 dataset/
 ├── input_GPR/          # Raw GPR input images (1000 samples)
