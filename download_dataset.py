@@ -41,11 +41,14 @@ def download_dataset(
 
     try:
         # Download the entire repository
+        # Note: snapshot_download automatically resumes interrupted downloads
+        # and skips files that are already present and up-to-date
         download_path = snapshot_download(
             repo_id=repo_id,
             repo_type=repo_type,
             local_dir=output_path,
             local_dir_use_symlinks=False,  # Copy files instead of symlinking
+            resume_download=True,  # Resume interrupted downloads (default: True)
         )
 
         logger.info(f"✓ Dataset downloaded successfully to: {download_path}")

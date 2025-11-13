@@ -29,6 +29,8 @@ python download_dataset.py --output dataset_raw
 python download_dataset.py --repo-id Seattle-Aquarium/Seattle_Aquarium_benthic_imagery --output my_dataset
 ```
 
+**Note**: The download script automatically resumes if interrupted. If the download stops partway through, simply re-run the same command and it will continue from where it left off without re-downloading existing files.
+
 The download script will automatically detect the dataset structure and provide next steps.
 
 ### 2. Prepare Dataset for Training
