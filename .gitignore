@@ -2,6 +2,11 @@
 training_data/
 test_data/
 output/
+dataset_cropped/
+dataset_hf/
+my_dataset/
+my_dataset_cropped/
+
 
 # gpr_tools binaries
 gpr_tools
