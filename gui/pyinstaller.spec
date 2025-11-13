@@ -12,9 +12,18 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 # - We need to get to the project root directory
 #
 # Strategy: Get the directory of this spec file, then go up one level
+print(f"\nDEBUG: SPECPATH = {SPECPATH}")
+print(f"DEBUG: os.getcwd() = {os.getcwd()}")
+
 spec_file_path = os.path.abspath(SPECPATH)
+print(f"DEBUG: spec_file_path (absolute) = {spec_file_path}")
+
 spec_file_dir = os.path.dirname(spec_file_path)  # .../gui
+print(f"DEBUG: spec_file_dir = {spec_file_dir}")
+
 spec_dir = os.path.dirname(spec_file_dir)  # .../ (project root)
+print(f"DEBUG: spec_dir (project root) = {spec_dir}")
+
 sys.path.insert(0, spec_dir)
 
 block_cipher = None
