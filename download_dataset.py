@@ -8,8 +8,9 @@ for use with the training pipeline.
 
 import argparse
 import logging
+import os
 from pathlib import Path
-from huggingface_hub import snapshot_download
+from huggingface_hub import snapshot_download, HfFolder
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +25,8 @@ DEFAULT_REPO_ID = "Seattle-Aquarium/Seattle_Aquarium_benthic_imagery"
 def download_dataset(
     repo_id: str = DEFAULT_REPO_ID,
     output_dir: str = "dataset",
-    repo_type: str = "dataset"
+    repo_type: str = "dataset",
+    token: str = None
 ):
     """
     Download dataset from Hugging Face Hub
@@ -33,8 +35,24 @@ def download_dataset(
         repo_id: Hugging Face repository ID (default: DEFAULT_REPO_ID)
         output_dir: Local directory to save the dataset
         repo_type: Type of repository ('dataset', 'model', or 'space')
+        token: Hugging Face API token (optional, will use HF_TOKEN env var or saved token)
     """
     output_path = Path(output_dir)
+
+    # Get token from various sources
+    if token is None:
+        # Try environment variable first
+        token = os.environ.get("HF_TOKEN")
+        if token is None:
+            # Try saved token from huggingface-cli login
+            token = HfFolder.get_token()
+
+    if token:
+        logger.info("Using Hugging Face authentication token")
+    else:
+        logger.warning("No Hugging Face token found - may hit rate limits for large downloads")
+        logger.warning("To authenticate, run: huggingface-cli login")
+        logger.warning("Or set HF_TOKEN environment variable")
 
     logger.info(f"Downloading dataset '{repo_id}' from Hugging Face...")
     logger.info(f"Destination: {output_path.absolute()}")
@@ -49,6 +67,7 @@ def download_dataset(
             local_dir=output_path,
             local_dir_use_symlinks=False,  # Copy files instead of symlinking
             resume_download=True,  # Resume interrupted downloads (default: True)
+            token=token,  # Authentication token
         )
 
         logger.info(f"✓ Dataset downloaded successfully to: {download_path}")
@@ -105,13 +124,30 @@ def download_dataset(
         return download_path
 
     except Exception as e:
-        logger.error(f"Error downloading dataset: {e}")
-        logger.error(f"\nPlease check:")
-        logger.error(f"  1. Your internet connection")
-        logger.error(f"  2. The repository ID is correct: {repo_id}")
-        logger.error(f"  3. You have access to the repository (if private)")
-        logger.error(f"\nFor private repositories, you may need to login first:")
-        logger.error(f"  huggingface-cli login")
+        error_msg = str(e).lower()
+
+        # Check for specific error types
+        if "rate limit" in error_msg or "429" in error_msg:
+            logger.error(f"Rate limit error: {e}")
+            logger.error(f"\n⚠️  RATE LIMIT EXCEEDED ⚠️")
+            logger.error(f"\nYou need to authenticate with Hugging Face to continue:")
+            logger.error(f"\nOption 1 - Login via CLI (recommended):")
+            logger.error(f"  huggingface-cli login")
+            logger.error(f"  # Then re-run this script")
+            logger.error(f"\nOption 2 - Set environment variable:")
+            logger.error(f"  export HF_TOKEN=your_token_here")
+            logger.error(f"  python download_dataset.py --output {output_dir}")
+            logger.error(f"\nOption 3 - Pass token as argument:")
+            logger.error(f"  python download_dataset.py --token your_token_here")
+            logger.error(f"\nGet your token at: https://huggingface.co/settings/tokens")
+        else:
+            logger.error(f"Error downloading dataset: {e}")
+            logger.error(f"\nPlease check:")
+            logger.error(f"  1. Your internet connection")
+            logger.error(f"  2. The repository ID is correct: {repo_id}")
+            logger.error(f"  3. You have access to the repository (if private)")
+            logger.error(f"\nFor authentication issues, login first:")
+            logger.error(f"  huggingface-cli login")
         raise
 
 
@@ -130,9 +166,16 @@ Examples:
   # Download a different dataset
   python download_dataset.py --repo-id username/dataset-name
 
-  # For private datasets, login first:
+  # For private datasets or to avoid rate limits, login first:
   huggingface-cli login
   python download_dataset.py --repo-id username/private-dataset
+
+  # Or pass token directly:
+  python download_dataset.py --token hf_xxxxxxxxxxxxx
+
+  # Or use environment variable:
+  export HF_TOKEN=hf_xxxxxxxxxxxxx
+  python download_dataset.py
         """
     )
 
@@ -158,12 +201,20 @@ Examples:
         help='Type of Hugging Face repository (default: dataset)'
     )
 
+    parser.add_argument(
+        '--token',
+        type=str,
+        default=None,
+        help='Hugging Face API token (optional, can also use HF_TOKEN env var or huggingface-cli login)'
+    )
+
     args = parser.parse_args()
 
     download_dataset(
         repo_id=args.repo_id,
         output_dir=args.output,
-        repo_type=args.repo_type
+        repo_type=args.repo_type,
+        token=args.token
     )
 
 

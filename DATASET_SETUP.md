@@ -21,11 +21,27 @@ dataset/
 
 ### 1. Download Dataset from Hugging Face
 
+**Important**: For large datasets, you need to authenticate with Hugging Face to avoid rate limits:
+
 ```bash
-# Download the entire dataset
+# First-time setup: Login to Hugging Face (one-time)
+huggingface-cli login
+# Follow the prompts and paste your token from https://huggingface.co/settings/tokens
+
+# Then download the dataset
+python download_dataset.py --output dataset_raw
+```
+
+**Alternative authentication methods:**
+```bash
+# Method 1: Environment variable
+export HF_TOKEN=hf_xxxxxxxxxxxxx
 python download_dataset.py --output dataset_raw
 
-# Or download to a custom location
+# Method 2: Pass token directly
+python download_dataset.py --output dataset_raw --token hf_xxxxxxxxxxxxx
+
+# Method 3: Different dataset
 python download_dataset.py --repo-id Seattle-Aquarium/Seattle_Aquarium_benthic_imagery --output my_dataset
 ```
 

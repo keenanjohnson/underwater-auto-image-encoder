@@ -24,6 +24,9 @@ python preprocess_images.py /path/to/gpr/files --output-dir processed
 
 #### From Hugging Face (Set-Based Structure)
 ```bash
+# First-time: Authenticate to avoid rate limits
+huggingface-cli login
+
 # Download dataset from Hugging Face
 python download_dataset.py --output dataset_raw
 
