@@ -6,8 +6,15 @@ import os
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
-# Ensure src is importable - go up one level from gui/ to project root
-spec_dir = os.path.dirname(os.path.dirname(os.path.abspath(SPECPATH)))
+# Ensure src is importable
+# When running "pyinstaller gui/pyinstaller.spec" from project root:
+# - SPECPATH will be "gui/pyinstaller.spec" (relative) or full path
+# - We need to get to the project root directory
+#
+# Strategy: Get the directory of this spec file, then go up one level
+spec_file_path = os.path.abspath(SPECPATH)
+spec_file_dir = os.path.dirname(spec_file_path)  # .../gui
+spec_dir = os.path.dirname(spec_file_dir)  # .../ (project root)
 sys.path.insert(0, spec_dir)
 
 block_cipher = None
@@ -20,6 +27,13 @@ elif system == 'darwin':
     gpr_binary = (os.path.join(spec_dir, 'binaries/darwin/gpr_tools'), 'binaries/darwin')
 else:
     gpr_binary = (os.path.join(spec_dir, 'binaries/linux/gpr_tools'), 'binaries/linux')
+
+# Debug: print what we're looking for
+print(f"\nProject root: {spec_dir}")
+print(f"Looking for binary at: {gpr_binary[0]}")
+print(f"Binary directory exists: {os.path.exists(os.path.dirname(gpr_binary[0]))}")
+if os.path.exists(os.path.dirname(gpr_binary[0])):
+    print(f"Contents of binary directory: {os.listdir(os.path.dirname(gpr_binary[0]))}")
 
 # Check if binary exists - REQUIRED for packaging
 binary_path = Path(gpr_binary[0])
