@@ -36,7 +36,7 @@ def download_dataset(
     repo_type: str = "dataset",
     token: str = None,
     max_retries: int = 20,
-    initial_retry_delay: int = 300
+    initial_retry_delay: int = 310
 ):
     """
     Download dataset from Hugging Face Hub with automatic retry on rate limits
@@ -46,8 +46,8 @@ def download_dataset(
         output_dir: Local directory to save the dataset
         repo_type: Type of repository ('dataset', 'model', or 'space')
         token: Hugging Face API token (optional, will use HF_TOKEN env var or saved token)
-        max_retries: Maximum number of retry attempts for rate limits (default: 5)
-        initial_retry_delay: Initial delay in seconds before first retry (default: 60)
+        max_retries: Maximum number of retry attempts for rate limits (default: 20)
+        initial_retry_delay: Initial delay in seconds before first retry (default: 310 - HF rate limit is 5 min)
     """
     output_path = Path(output_dir)
 
@@ -120,16 +120,27 @@ def download_dataset(
                     logger.error(f"\nOption 3 - Pass token as argument:")
                     logger.error(f"  python download_dataset.py --token your_token_here")
                     logger.error(f"\nGet your token at: https://huggingface.co/settings/tokens")
+                    logger.error(f"\nAlternatively, upgrade to HuggingFace PRO for higher rate limits:")
+                    logger.error(f"  https://huggingface.co/pricing")
                     raise
                 else:
                     # Rate limited but we can retry
                     logger.warning(f"\n⚠️  Rate limit hit (attempt {retry_count}/{max_retries})")
-                    logger.warning(f"Waiting {retry_delay} seconds before retrying...")
+                    logger.warning(f"HuggingFace rate limit: 1000 API requests per 5 minutes")
+                    logger.warning(f"Waiting {retry_delay} seconds (~{retry_delay//60} minutes) before retrying...")
                     logger.warning(f"Download will resume from where it left off")
-                    time.sleep(retry_delay)
+                    logger.info(f"\nTo avoid rate limits in the future:")
+                    logger.info(f"  1. Authenticate with: huggingface-cli login")
+                    logger.info(f"  2. Or upgrade to HuggingFace PRO: https://huggingface.co/pricing")
+
+                    # Wait with progress indicator
+                    for remaining in range(retry_delay, 0, -30):
+                        logger.info(f"Waiting... {remaining} seconds remaining")
+                        time.sleep(min(30, remaining))
+
                     # Exponential backoff: double the delay for next retry
-                    retry_delay = min(retry_delay * 2, 600)  # Cap at 10 minutes
-                    logger.info(f"Retrying download (attempt {retry_count + 1}/{max_retries + 1})...")
+                    retry_delay = min(retry_delay * 2, 1200)  # Cap at 20 minutes
+                    logger.info(f"\nRetrying download (attempt {retry_count + 1}/{max_retries + 1})...")
                     continue
             else:
                 # Non-rate-limit error - fail immediately
@@ -142,22 +153,37 @@ def download_dataset(
                 logger.error(f"  huggingface-cli login")
                 raise
 
+    # Verify the download was successful
+    if download_path is None:
+        logger.error("\n❌ Download failed - no data was downloaded")
+        logger.error("This may be due to:")
+        logger.error("  1. Rate limiting (wait 5+ minutes and try again)")
+        logger.error("  2. Authentication issues (run: huggingface-cli login)")
+        logger.error("  3. Network connectivity problems")
+        return None
+
     # Verify the expected structure - check for both old and new formats
     input_dir = output_path / "input"
     target_dir = output_path / "target"
 
     # Check for old structure (input/ and target/ at root)
     if input_dir.exists() and target_dir.exists():
-        # Count files
-        input_files = list(input_dir.glob('*'))
-        target_files = list(target_dir.glob('*'))
+        # Count files (recursively to catch all images)
+        input_files = list(input_dir.rglob('*.tif')) + list(input_dir.rglob('*.tiff'))
+        target_files = list(target_dir.rglob('*.tif')) + list(target_dir.rglob('*.tiff'))
 
         logger.info(f"\nDataset structure verified (legacy format):")
         logger.info(f"  Input images: {len(input_files)} files")
         logger.info(f"  Target images: {len(target_files)} files")
-        logger.info(f"\nDataset ready for training!")
-        logger.info(f"\nTo train the model, run:")
-        logger.info(f"  python train.py --input-dir {input_dir} --target-dir {target_dir}")
+
+        if len(input_files) == 0 and len(target_files) == 0:
+            logger.warning(f"\n⚠️  WARNING: Dataset directories exist but no images found!")
+            logger.warning(f"This likely means the download was interrupted by rate limiting.")
+            logger.warning(f"Please wait 5 minutes and run the download again - it will resume from where it left off.")
+        else:
+            logger.info(f"\nDataset ready for training!")
+            logger.info(f"\nTo train the model, run:")
+            logger.info(f"  python train.py --input-dir {input_dir} --target-dir {target_dir}")
     else:
         # Check for new structure (set01/, set02/, etc.)
         set_dirs = sorted([d for d in output_path.iterdir() if d.is_dir() and d.name.startswith('set')])
@@ -174,22 +200,35 @@ def download_dataset(
                 set_output = set_dir / "output"
 
                 if set_input.exists() and set_output.exists():
-                    n_input = len(list(set_input.glob('*')))
-                    n_output = len(list(set_output.glob('*')))
+                    # Count TIFF files specifically
+                    input_files = list(set_input.glob('*.tif')) + list(set_input.glob('*.tiff'))
+                    output_files = list(set_output.glob('*.tif')) + list(set_output.glob('*.tiff'))
+                    n_input = len(input_files)
+                    n_output = len(output_files)
                     total_input += n_input
                     total_output += n_output
                     logger.info(f"    {set_dir.name}: {n_input} input, {n_output} output images")
 
             logger.info(f"\n  Total: {total_input} input, {total_output} output images")
-            logger.info(f"\nTo prepare the dataset for training, run:")
-            logger.info(f"  python prepare_huggingface_dataset.py {output_path} --output training_dataset")
-            logger.info(f"\nOr to use a specific set:")
-            logger.info(f"  python prepare_huggingface_dataset.py {output_path}/set01 --output training_dataset")
+
+            if total_input == 0 and total_output == 0:
+                logger.warning(f"\n⚠️  WARNING: Dataset directories exist but no images found!")
+                logger.warning(f"This likely means the download was interrupted by rate limiting.")
+                logger.warning(f"Please wait 5 minutes and run the download again - it will resume from where it left off.")
+                logger.warning(f"\nAlternatively:")
+                logger.warning(f"  1. Authenticate with: huggingface-cli login")
+                logger.warning(f"  2. Or upgrade to HuggingFace PRO: https://huggingface.co/pricing")
+            else:
+                logger.info(f"\nTo prepare the dataset for training, run:")
+                logger.info(f"  python prepare_huggingface_dataset.py {output_path} --output training_dataset")
+                logger.info(f"\nOr to use a specific set:")
+                logger.info(f"  python prepare_huggingface_dataset.py {output_path}/set01 --output training_dataset")
         else:
             logger.warning(f"\nWarning: Could not detect dataset structure in {output_path}")
             logger.warning(f"Expected either:")
             logger.warning(f"  - Legacy format: input/ and target/ directories")
             logger.warning(f"  - Set-based format: set01/, set02/, etc. with input/ and output/ subdirectories")
+            logger.warning(f"\nThe download may have been interrupted. Try running again to resume.")
 
     return download_path
 
@@ -220,11 +259,12 @@ Examples:
   export HF_TOKEN=hf_xxxxxxxxxxxxx
   python download_dataset.py
 
-  # Customize retry behavior (increase retries, shorter delays):
-  python download_dataset.py --max-retries 10 --retry-delay 30
+  # Customize retry behavior:
+  python download_dataset.py --max-retries 10 --retry-delay 310
 
 Note: Downloads automatically resume from where they left off if interrupted.
-Rate limits trigger automatic retries with exponential backoff (60s, 120s, 240s, etc).
+Rate limits trigger automatic retries with exponential backoff (310s, 620s, 1200s, etc).
+HuggingFace rate limit: 1000 API requests per 5 minutes for free accounts.
         """
     )
 
@@ -267,8 +307,8 @@ Rate limits trigger automatic retries with exponential backoff (60s, 120s, 240s,
     parser.add_argument(
         '--retry-delay',
         type=int,
-        default=60,
-        help='Initial delay in seconds before first retry (default: 60, doubles each retry)'
+        default=310,
+        help='Initial delay in seconds before first retry (default: 310 - HF rate limit is 5 min, doubles each retry)'
     )
 
     args = parser.parse_args()

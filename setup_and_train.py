@@ -154,6 +154,20 @@ Examples:
     )
 
     parser.add_argument(
+        '--max-retries',
+        type=int,
+        default=None,
+        help='Maximum number of retry attempts for HuggingFace rate limits (default: 20)'
+    )
+
+    parser.add_argument(
+        '--retry-delay',
+        type=int,
+        default=None,
+        help='Initial delay in seconds before first retry (default: 310 - HF rate limit is 5 min)'
+    )
+
+    parser.add_argument(
         '--sets',
         nargs='+',
         default=None,
@@ -340,6 +354,16 @@ Examples:
 
         if hf_token:
             cmd.extend(['--token', hf_token])
+
+        # Add retry parameters if specified
+        max_retries = args.max_retries or download_config.get('max_retries')
+        retry_delay = args.retry_delay or download_config.get('retry_delay')
+
+        if max_retries is not None:
+            cmd.extend(['--max-retries', str(max_retries)])
+
+        if retry_delay is not None:
+            cmd.extend(['--retry-delay', str(retry_delay)])
 
         run_command(cmd, "Download dataset from HuggingFace")
     else:
