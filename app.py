@@ -159,10 +159,14 @@ def main():
         logger.info(f"Underwater Enhancer v{__version__}")
         logger.info(f"PyTorch Version: {torch.__version__}")
         logger.info(f"CUDA Available: {torch.cuda.is_available()}")
+        logger.info(f"MPS Available: {torch.backends.mps.is_available()}")
+
         if torch.cuda.is_available():
             logger.info(f"CUDA Version: {torch.version.cuda}")
             logger.info(f"GPU Device: {torch.cuda.get_device_name(0)}")
             logger.info(f"GPU Count: {torch.cuda.device_count()}")
+        elif torch.backends.mps.is_available():
+            logger.info("Running in MPS mode (Apple Silicon GPU)")
         else:
             logger.info("Running in CPU mode")
 
