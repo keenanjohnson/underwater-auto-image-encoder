@@ -240,8 +240,9 @@ class UnderwaterEnhancerApp(ctk.CTk):
         self.cancel_btn.pack(side="left", padx=5)
 
         # GPU/CPU indicator in the middle
-        device_type = "GPU" if torch.cuda.is_available() else "CPU"
-        device_color = "green" if torch.cuda.is_available() else "orange"
+        has_gpu = torch.cuda.is_available() or torch.backends.mps.is_available()
+        device_type = "GPU" if has_gpu else "CPU"
+        device_color = "green" if has_gpu else "orange"
 
         # Get additional device info
         if torch.cuda.is_available():
@@ -250,6 +251,8 @@ class UnderwaterEnhancerApp(ctk.CTk):
                 device_tooltip = f"{gpu_name}"
             except:
                 device_tooltip = "Hardware Accelerated"
+        elif torch.backends.mps.is_available():
+            device_tooltip = "Apple Silicon (MPS)"
         else:
             device_tooltip = "CPU Processing"
 

@@ -127,10 +127,16 @@ class Inferencer:
             # Handle Colab checkpoint format - create default config
             self.config = self._create_default_config(checkpoint)
         
-        self.device = torch.device(
-            'cuda' if torch.cuda.is_available() else 'cpu'
-        )
-        logger.info(f"Using device: {self.device}")
+        # Setup device (CUDA > MPS > CPU) - matching train.py
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+            logger.info(f"Using device: {self.device}")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+            logger.info(f"Using device: {self.device} (Apple Silicon)")
+        else:
+            self.device = torch.device('cpu')
+            logger.info(f"Using device: {self.device}")
         
         self.setup_model()
         

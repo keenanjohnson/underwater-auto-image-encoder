@@ -49,7 +49,12 @@ class ImageProcessor:
 
             # Log device information clearly
             import torch
-            device_type = "GPU (CUDA)" if torch.cuda.is_available() else "CPU"
+            if torch.cuda.is_available():
+                device_type = "GPU (CUDA)"
+            elif torch.backends.mps.is_available():
+                device_type = "GPU (MPS)"
+            else:
+                device_type = "CPU"
             logger.info(f"Model loaded from {self.model_path} - Using {device_type} - Full resolution processing enabled")
     
     def process_image(self, input_path: Path, output_path: Path, 
@@ -193,6 +198,8 @@ class ImageProcessor:
         if torch.cuda.is_available():
             device_name = torch.cuda.get_device_name(0) if torch.cuda.device_count() > 0 else "CUDA GPU"
             return (device_name, True)
+        elif torch.backends.mps.is_available():
+            return ("Apple Silicon (MPS)", True)
         else:
             return ("CPU", False)
 
