@@ -10,7 +10,14 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from huggingface_hub import snapshot_download, HfFolder
+from huggingface_hub import snapshot_download
+
+try:
+    from huggingface_hub import HfFolder
+except ImportError:
+    # HfFolder was deprecated, use get_token instead
+    from huggingface_hub import get_token
+    HfFolder = None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,7 +52,15 @@ def download_dataset(
         token = os.environ.get("HF_TOKEN")
         if token is None:
             # Try saved token from huggingface-cli login
-            token = HfFolder.get_token()
+            try:
+                if HfFolder is not None:
+                    token = HfFolder.get_token()
+                else:
+                    # Use new API
+                    token = get_token()
+            except Exception:
+                # If all else fails, token remains None
+                pass
 
     if token:
         logger.info("Using Hugging Face authentication token")
