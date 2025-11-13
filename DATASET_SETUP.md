@@ -45,9 +45,18 @@ python download_dataset.py --output dataset_raw --token hf_xxxxxxxxxxxxx
 python download_dataset.py --repo-id Seattle-Aquarium/Seattle_Aquarium_benthic_imagery --output my_dataset
 ```
 
-**Note**: The download script automatically resumes if interrupted. If the download stops partway through, simply re-run the same command and it will continue from where it left off without re-downloading existing files.
+**Smart Download Features**:
+- **Automatic resume**: If interrupted, re-run the same command to continue from where it left off
+- **Rate limit handling**: Automatically retries up to 5 times with exponential backoff (60s, 120s, 240s, 480s, 600s)
+- **Progress preservation**: Already downloaded files are never re-downloaded
 
 The download script will automatically detect the dataset structure and provide next steps.
+
+**Customize retry behavior** (if needed):
+```bash
+# Increase retries for unstable connections
+python download_dataset.py --max-retries 10 --retry-delay 30
+```
 
 ### 2. Prepare Dataset for Training
 

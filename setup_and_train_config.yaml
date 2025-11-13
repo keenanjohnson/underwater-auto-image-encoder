@@ -1,0 +1,41 @@
+# Configuration for setup_and_train.py
+# All-in-one script for downloading, preparing, cropping, and training
+
+# Dataset Download Configuration
+download:
+  repo_id: "Seattle-Aquarium/Seattle_Aquarium_benthic_imagery"
+  dataset_dir: "dataset_raw"  # Directory to download/store raw dataset
+
+# Dataset Preparation Configuration
+preparation:
+  working_dir: "training_dataset"  # Working directory for prepared dataset
+  sets: null  # Specific sets to process (null = all sets). Example: ["set01", "set02"]
+  symlink: false  # Use symlinks instead of copying (saves disk space)
+  split_ratio: 0.8  # Train/validation split ratio
+
+# Cropping Configuration
+cropping:
+  input:
+    width: 4606  # Crop width for input images
+    height: 4030  # Crop height for input images
+  output:
+    enabled: false  # Skip output cropping (HuggingFace outputs are already consistent)
+    width: 4606  # Only used if enabled
+    height: 4030  # Only used if enabled
+
+# Training Configuration
+training:
+  image_size: 256  # Training image size (patches)
+  batch_size: 8  # Training batch size
+  epochs: 150  # Number of training epochs
+  learning_rate: 0.0001  # Learning rate
+  output_dir: "output"  # Output directory for trained models
+  checkpoint_dir: "checkpoints"  # Checkpoint directory
+  resume: null  # Resume from checkpoint (null = start fresh)
+
+# Step Control (skip completed steps)
+steps:
+  skip_download: false  # Skip if dataset already downloaded
+  skip_prepare: false  # Skip if already prepared
+  skip_crop: false  # Skip if already cropped
+  prepare_only: false  # Only download/prepare/crop, don't train
