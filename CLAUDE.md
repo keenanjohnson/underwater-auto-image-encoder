@@ -32,6 +32,9 @@ python setup_and_train.py
 
 # Custom parameters
 python setup_and_train.py --batch-size 4 --epochs 100 --skip-output-crop
+
+# Start fresh (cleanup and re-train)
+python cleanup_training.py --force && python setup_and_train.py --skip-download
 ```
 
 **Manual Step-by-Step:**
@@ -103,6 +106,24 @@ python compare_denoise_methods.py input.tiff --output comparison.png
 python test_preprocessing.py
 
 # No formal test suite yet - evaluate visually using inference with --compare flag
+```
+
+### Cleanup & Utilities
+```bash
+# Preview what will be removed (safe)
+python cleanup_training.py --dry-run
+
+# Clean up all intermediate files (keeps raw dataset)
+python cleanup_training.py
+
+# Complete cleanup including raw dataset
+python cleanup_training.py --remove-raw-dataset --force
+
+# Keep specific artifacts
+python cleanup_training.py --keep-checkpoints --keep-outputs
+
+# See full cleanup guide
+cat CLEANUP_GUIDE.md
 ```
 
 ## High-Level Architecture
