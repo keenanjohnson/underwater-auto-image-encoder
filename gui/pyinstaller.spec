@@ -106,7 +106,7 @@ for root, dirs, files in os.walk(src_path):
 # Silently collect files (debug output removed)
 
 a = Analysis(
-    [os.path.join('gui', 'app.py')],
+    [os.path.join(spec_dir, 'gui', 'app.py')],
     pathex=[spec_dir],  # Add absolute path to project root
     binaries=binaries,
     datas=[
