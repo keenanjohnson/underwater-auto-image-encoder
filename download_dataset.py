@@ -50,24 +50,54 @@ def download_dataset(
 
         logger.info(f"✓ Dataset downloaded successfully to: {download_path}")
 
-        # Verify the expected structure
+        # Verify the expected structure - check for both old and new formats
         input_dir = output_path / "input"
         target_dir = output_path / "target"
 
+        # Check for old structure (input/ and target/ at root)
         if input_dir.exists() and target_dir.exists():
             # Count files
             input_files = list(input_dir.glob('*'))
             target_files = list(target_dir.glob('*'))
 
-            logger.info(f"\nDataset structure verified:")
+            logger.info(f"\nDataset structure verified (legacy format):")
             logger.info(f"  Input images: {len(input_files)} files")
             logger.info(f"  Target images: {len(target_files)} files")
             logger.info(f"\nDataset ready for training!")
             logger.info(f"\nTo train the model, run:")
-            logger.info(f"  python train.py --config config.yaml")
+            logger.info(f"  python train.py --input-dir {input_dir} --target-dir {target_dir}")
         else:
-            logger.warning(f"\nWarning: Expected 'input/' and 'target/' directories not found")
-            logger.warning(f"Please verify the dataset structure in {output_path}")
+            # Check for new structure (set01/, set02/, etc.)
+            set_dirs = sorted([d for d in output_path.iterdir() if d.is_dir() and d.name.startswith('set')])
+
+            if set_dirs:
+                logger.info(f"\nDataset structure verified (set-based format):")
+                logger.info(f"  Found {len(set_dirs)} set directories")
+
+                total_input = 0
+                total_output = 0
+
+                for set_dir in set_dirs:
+                    set_input = set_dir / "input"
+                    set_output = set_dir / "output"
+
+                    if set_input.exists() and set_output.exists():
+                        n_input = len(list(set_input.glob('*')))
+                        n_output = len(list(set_output.glob('*')))
+                        total_input += n_input
+                        total_output += n_output
+                        logger.info(f"    {set_dir.name}: {n_input} input, {n_output} output images")
+
+                logger.info(f"\n  Total: {total_input} input, {total_output} output images")
+                logger.info(f"\nTo prepare the dataset for training, run:")
+                logger.info(f"  python prepare_huggingface_dataset.py {output_path} --output training_dataset")
+                logger.info(f"\nOr to use a specific set:")
+                logger.info(f"  python prepare_huggingface_dataset.py {output_path}/set01 --output training_dataset")
+            else:
+                logger.warning(f"\nWarning: Could not detect dataset structure in {output_path}")
+                logger.warning(f"Expected either:")
+                logger.warning(f"  - Legacy format: input/ and target/ directories")
+                logger.warning(f"  - Set-based format: set01/, set02/, etc. with input/ and output/ subdirectories")
 
         return download_path
 
