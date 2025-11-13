@@ -134,9 +134,12 @@ def download_dataset(
                     logger.info(f"  2. Or upgrade to HuggingFace PRO: https://huggingface.co/pricing")
 
                     # Wait with progress indicator
-                    for remaining in range(retry_delay, 0, -30):
+                    remaining = retry_delay
+                    while remaining > 0:
                         logger.info(f"Waiting... {remaining} seconds remaining")
-                        time.sleep(min(30, remaining))
+                        sleep_time = min(30, remaining)
+                        time.sleep(sleep_time)
+                        remaining -= sleep_time
 
                     # Exponential backoff: double the delay for next retry
                     retry_delay = min(retry_delay * 2, 1200)  # Cap at 20 minutes
