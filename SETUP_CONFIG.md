@@ -35,8 +35,14 @@ The config file is organized into sections:
 download:
   repo_id: "Seattle-Aquarium/Seattle_Aquarium_benthic_imagery"
   dataset_dir: "dataset_raw"
-  hf_token: null  # Leave as null to use environment variable or CLI login
+  # Note: hf_token is NOT stored in config for security
+  # Use --hf-token CLI argument or HF_TOKEN env variable instead
 ```
+
+**Security Note**: The `hf_token` is intentionally NOT configurable via the YAML file. Always use:
+- CLI argument: `--hf-token your_token`
+- Environment variable: `export HF_TOKEN=your_token`
+- Or login once: `huggingface-cli login`
 
 ### Preparation Section
 ```yaml
@@ -208,6 +214,30 @@ If no config file exists, the script uses these defaults:
 - Learning rate 1e-4
 - 80/20 train/val split
 
+## Security Best Practices
+
+**Never store secrets in config files:**
+- The `hf_token` parameter is intentionally NOT available in the config file
+- Always use CLI arguments or environment variables for sensitive data
+- Config files may be committed to version control, so keep them secret-free
+
+**Recommended authentication methods (in order of preference):**
+1. **One-time login** (best for local development):
+   ```bash
+   huggingface-cli login
+   ```
+
+2. **Environment variable** (best for CI/CD):
+   ```bash
+   export HF_TOKEN=your_token_here
+   python setup_and_train.py
+   ```
+
+3. **CLI argument** (use for one-off runs):
+   ```bash
+   python setup_and_train.py --hf-token your_token_here
+   ```
+
 ## Tips
 
 1. **Start with the example:** Copy `setup_and_train_config_example.yaml` and modify incrementally
@@ -215,6 +245,7 @@ If no config file exists, the script uses these defaults:
 3. **Use meaningful names:** When saving configs for experiments, use descriptive names
 4. **Keep it simple:** Start with defaults and only change what you need
 5. **Version control:** Commit experiment configs to track what settings produced which results
+6. **Keep secrets out:** Never add tokens or passwords to config files
 
 ## Troubleshooting
 

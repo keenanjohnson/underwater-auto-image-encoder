@@ -279,7 +279,8 @@ Examples:
     download_config = config.get('download', {})
     dataset_dir = args.dataset_dir or download_config.get('dataset_dir', 'dataset_raw')
     repo_id = args.repo_id or download_config.get('repo_id', 'Seattle-Aquarium/Seattle_Aquarium_benthic_imagery')
-    hf_token = args.hf_token or download_config.get('hf_token')
+    # Note: hf_token is ONLY from CLI or env var, never from config file (security)
+    hf_token = args.hf_token
 
     # Preparation config
     prep_config = config.get('preparation', {})

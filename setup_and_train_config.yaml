@@ -3,9 +3,8 @@
 
 # Dataset Download Configuration
 download:
-  repo_id: "Seattle-Aquarium/Seattle_Aquarium_benthic_imagery"
+  repo_id: "keenanj/small-test"
   dataset_dir: "dataset_raw"  # Directory to download/store raw dataset
-  hf_token:  # HuggingFace token (null to use env var or CLI login)
 
 # Dataset Preparation Configuration
 preparation:
