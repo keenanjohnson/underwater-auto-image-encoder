@@ -23,21 +23,33 @@ python preprocess_images.py /path/to/gpr/files --output-dir processed
 ### Dataset Preparation
 
 #### From Hugging Face (Set-Based Structure)
+
+**Quick Start - All-in-One Script (Recommended for VMs):**
 ```bash
-# First-time: Authenticate to avoid rate limits
+# One command: download, prepare, crop, and train
+huggingface-cli login  # One-time setup
+python setup_and_train.py
+
+# Custom parameters
+python setup_and_train.py --batch-size 4 --epochs 100 --skip-output-crop
+```
+
+**Manual Step-by-Step:**
+```bash
+# Authenticate
 huggingface-cli login
 
-# Download dataset from Hugging Face
+# Download
 python download_dataset.py --output dataset_raw
 
-# Prepare all sets for training
+# Prepare
 python prepare_huggingface_dataset.py dataset_raw --output training_dataset
 
-# Prepare specific sets only
-python prepare_huggingface_dataset.py dataset_raw/set01 dataset_raw/set02 --output training_dataset
+# Crop (REQUIRED - images are different sizes)
+python crop_tiff.py training_dataset/input --output-dir training_dataset/input_cropped --width 4606 --height 4030
 
-# Use symlinks to save disk space
-python prepare_huggingface_dataset.py dataset_raw --output training_dataset --symlink
+# Train
+python train.py --input-dir training_dataset/input_cropped --target-dir training_dataset/target
 ```
 
 #### From Local Files
