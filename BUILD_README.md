@@ -61,7 +61,7 @@ pip install -r requirements_gui.txt
 
 ### 4. Build with PyInstaller
 ```bash
-pyinstaller pyinstaller.spec --clean --noconfirm
+pyinstaller gui/pyinstaller.spec --clean --noconfirm
 ```
 
 ## GitHub Actions Build
@@ -143,7 +143,7 @@ chmod +x build_scripts/compile_gpr_tools.sh
 
 ### 5. Run Development Version
 ```bash
-python app.py
+python gui/app.py
 ```
 
 ## Testing the Build
@@ -181,7 +181,7 @@ If the build fails with "GPR tools binary not found":
 
 **Import Errors in Built App**
 - Ensure all dependencies are installed in the virtual environment
-- Check pyinstaller.spec hiddenimports section
+- Check gui/pyinstaller.spec hiddenimports section
 - Run with --debug flag for detailed output
 
 **GPR Files Not Working**
@@ -193,21 +193,21 @@ If the build fails with "GPR tools binary not found":
 1. Check Python version (3.8+ required)
 2. Ensure all dependencies installed: `pip install -r requirements_gui.txt`
 3. Clean build directory: `rm -rf build dist`
-4. Try again with console mode: Edit `pyinstaller.spec`, set `console=True`
+4. Try again with console mode: Edit `gui/pyinstaller.spec`, set `console=True`
 
 **macOS Security Warnings**
 - Sign the app: `codesign --deep --force --sign - dist/UnderwaterEnhancer.app`
 - Clear quarantine: `xattr -cr dist/UnderwaterEnhancer.app`
 - Users may need to allow in System Preferences > Security & Privacy
-- See [MACOS_APP_INSTALLATION.md](MACOS_APP_INSTALLATION.md) for user instructions
+- See [gui/docs/MACOS_APP_INSTALLATION.md](gui/docs/MACOS_APP_INSTALLATION.md) for user instructions
 
 ### Debug Mode
 ```bash
 # Build with debug output
-pyinstaller pyinstaller.spec --debug all
+pyinstaller gui/pyinstaller.spec --debug all
 
 # Run with console window (Windows)
-pyinstaller pyinstaller.spec --console
+pyinstaller gui/pyinstaller.spec --console
 ```
 
 ### PyTorch Installation
@@ -274,7 +274,7 @@ git push origin v1.0.0
 
 ## Version Management
 
-1. Update version in `app.py`:
+1. Update version in `gui/app.py`:
 ```python
 __version__ = "0.1.0-beta"
 ```

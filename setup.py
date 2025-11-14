@@ -5,14 +5,14 @@ Setup script for Underwater Image Enhancer
 from setuptools import setup, find_packages
 from pathlib import Path
 
-# Read version from app.py
+# Read version from gui/app.py
 import re
-with open("app.py") as f:
+with open("gui/app.py") as f:
     version_match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', f.read())
     version = version_match.group(1) if version_match else "0.2.0"
 
 # Read long description from README
-readme_path = Path(__file__).parent / "GUI_README.md"
+readme_path = Path(__file__).parent / "gui" / "docs" / "GUI_README.md"
 if readme_path.exists():
     long_description = readme_path.read_text()
 else:
@@ -49,7 +49,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "underwater-enhancer=app:main",
+            "underwater-enhancer=gui.app:main",
         ],
     },
     classifiers=[

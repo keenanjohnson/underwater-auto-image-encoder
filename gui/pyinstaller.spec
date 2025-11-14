@@ -7,19 +7,41 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 # Ensure src is importable
-spec_dir = os.path.dirname(os.path.abspath(SPECPATH))
+# When running "pyinstaller gui/pyinstaller.spec" from project root:
+# - SPECPATH is set by PyInstaller to the DIRECTORY containing the spec file
+# - We need to get to the project root directory (one level up from SPECPATH)
+#
+# IMPORTANT: SPECPATH is the directory path, not the file path!
+print(f"\nDEBUG: SPECPATH = {SPECPATH}")
+print(f"DEBUG: os.getcwd() = {os.getcwd()}")
+
+# SPECPATH is already the directory containing this spec file (.../gui)
+spec_file_dir = SPECPATH
+print(f"DEBUG: spec_file_dir = {spec_file_dir}")
+
+# Go up one level to get project root
+spec_dir = os.path.dirname(spec_file_dir)
+print(f"DEBUG: spec_dir (project root) = {spec_dir}")
+
 sys.path.insert(0, spec_dir)
 
 block_cipher = None
 
-# Determine platform-specific binaries
+# Determine platform-specific binaries (relative to project root)
 system = platform.system().lower()
 if system == 'windows':
-    gpr_binary = ('binaries/win32/gpr_tools.exe', 'binaries/win32')
+    gpr_binary = (os.path.join(spec_dir, 'binaries/win32/gpr_tools.exe'), 'binaries/win32')
 elif system == 'darwin':
-    gpr_binary = ('binaries/darwin/gpr_tools', 'binaries/darwin')
+    gpr_binary = (os.path.join(spec_dir, 'binaries/darwin/gpr_tools'), 'binaries/darwin')
 else:
-    gpr_binary = ('binaries/linux/gpr_tools', 'binaries/linux')
+    gpr_binary = (os.path.join(spec_dir, 'binaries/linux/gpr_tools'), 'binaries/linux')
+
+# Debug: print what we're looking for
+print(f"\nProject root: {spec_dir}")
+print(f"Looking for binary at: {gpr_binary[0]}")
+print(f"Binary directory exists: {os.path.exists(os.path.dirname(gpr_binary[0]))}")
+if os.path.exists(os.path.dirname(gpr_binary[0])):
+    print(f"Contents of binary directory: {os.listdir(os.path.dirname(gpr_binary[0]))}")
 
 # Check if binary exists - REQUIRED for packaging
 binary_path = Path(gpr_binary[0])
@@ -72,21 +94,23 @@ try:
 except:
     src_hiddenimports = src_modules
 
-# Ensure all src Python files are included
+# Ensure all src Python files are included (from project root)
 src_files = []
-for root, dirs, files in os.walk('src'):
+src_path = os.path.join(spec_dir, 'src')
+for root, dirs, files in os.walk(src_path):
     for file in files:
         if file.endswith('.py'):
-            src_files.append((os.path.join(root, file), root))
+            rel_root = os.path.relpath(root, spec_dir)
+            src_files.append((os.path.join(root, file), rel_root))
 
 # Silently collect files (debug output removed)
 
 a = Analysis(
-    ['app.py'],
-    pathex=[str(Path.cwd())],  # Add absolute path to current directory
+    [os.path.join(spec_dir, 'gui', 'app.py')],
+    pathex=[spec_dir],  # Add absolute path to project root
     binaries=binaries,
     datas=[
-        ('config.yaml', '.') if Path('config.yaml').exists() else ('config.yaml', '.'),
+        (os.path.join(spec_dir, 'config.yaml'), '.') if Path(os.path.join(spec_dir, 'config.yaml')).exists() else (os.path.join(spec_dir, 'config.yaml'), '.'),
     ] + src_files,  # Include all Python files from src
     hiddenimports=[
         'customtkinter',
@@ -102,9 +126,9 @@ a = Analysis(
         'tkinter',
         'darkdetect',
     ] + src_hiddenimports,  # Add all src submodules
-    hookspath=['.'],  # Use local hooks directory
+    hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
-    runtime_hooks=['runtime_hook.py'],
+    runtime_hooks=[os.path.join(spec_dir, 'gui', 'runtime_hook.py')],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -165,7 +189,7 @@ else:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon='assets/icon.ico' if system == 'windows' and Path('assets/icon.ico').exists() else None,
+        icon=os.path.join(spec_dir, 'assets', 'icon.ico') if system == 'windows' and Path(os.path.join(spec_dir, 'assets', 'icon.ico')).exists() else None,
     )
 
 # macOS specific
@@ -173,7 +197,7 @@ if system == 'darwin':
     app = BUNDLE(
         coll,
         name='UnderwaterEnhancer.app',
-        icon='assets/icon.icns' if Path('assets/icon.icns').exists() else None,
+        icon=os.path.join(spec_dir, 'assets', 'icon.icns') if Path(os.path.join(spec_dir, 'assets', 'icon.icns')).exists() else None,
         bundle_identifier='com.seattleaquarium.underwaterenhancer',
         info_plist={
             'CFBundleShortVersionString': '0.2.0',

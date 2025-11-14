@@ -235,13 +235,13 @@ Key settings:
 - ⏳ Phase 3: GPR support integration
 - ⏳ Phase 4: Polish & packaging
 
-### Running GUI Application (once implemented)
+### Running GUI Application
 ```bash
 # Development mode
-python app.py
+python gui/app.py
 
-# Build standalone executable
-pyinstaller pyinstaller.spec
+# Build standalone executable (run from project root)
+pyinstaller gui/pyinstaller.spec
 
 # Run packaged application
 ./dist/UnderwaterEnhancer  # Linux/macOS

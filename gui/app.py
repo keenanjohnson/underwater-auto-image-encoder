@@ -13,8 +13,8 @@ import logging
 import traceback
 from datetime import datetime
 
-# Add source directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add source directory to path (parent of gui directory)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def setup_logging(version=__version__):
     """Setup file logging for crash diagnosis"""

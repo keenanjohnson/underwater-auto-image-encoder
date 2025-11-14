@@ -258,11 +258,29 @@ jobs:
         python -c "import os; print('\n'.join(os.listdir('src/models')) if os.path.exists('src/models') else 'src/models does not exist!')"
         echo "Python files in src:"
         python -c "import os; [print(os.path.join(r, f)) for r, d, files in os.walk('src') for f in sorted(files) if f.endswith('.py')]"
-    
+
+    - name: Verify GPR binary exists before PyInstaller
+      run: |
+        echo "Checking for GPR binary at: ${{ matrix.gpr_binary }}"
+        if [ -f "${{ matrix.gpr_binary }}" ]; then
+          echo "✓ Binary found"
+          ls -lh "${{ matrix.gpr_binary }}"
+        else
+          echo "✗ Binary NOT found"
+          echo "Contents of binaries directory:"
+          ls -la binaries/ || echo "binaries/ directory does not exist"
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
+          exit 1
+        fi
+      shell: bash
+
     - name: Build with PyInstaller
       run: |
         echo "Building universal GPU/CPU executable..."
-        pyinstaller pyinstaller.spec --clean --noconfirm
+        pyinstaller gui/pyinstaller.spec --clean --noconfirm
         echo "Built universal GPU/CPU executable"
       shell: bash
     

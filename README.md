@@ -52,13 +52,13 @@ The application is safe to use. This warning appears for all unsigned executable
 pip install -r requirements.txt
 
 # Run the GUI application
-python app.py
+python gui/app.py
 ```
 
 ### Building the Executable
 ```bash
-# Build standalone executable for your platform
-python build_scripts/build_app.py
+# Build standalone executable for your platform (from project root)
+pyinstaller gui/pyinstaller.spec
 
 # Find the executable in:
 # Windows: dist/UnderwaterEnhancer.exe
@@ -66,7 +66,7 @@ python build_scripts/build_app.py
 # Linux:   dist/UnderwaterEnhancer
 ```
 
-For detailed GUI documentation, see [GUI_README.md](GUI_README.md).
+For detailed GUI documentation, see [gui/docs/GUI_README.md](gui/docs/GUI_README.md).
 
 ## 🚀 Quick Start (Command Line)
 
