@@ -16,7 +16,7 @@ from torchvision import transforms
 import logging
 from tqdm import tqdm
 
-sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
 from src.models.unet_autoencoder import UNetAutoencoder, LightweightUNet
 from src.models.attention_unet import AttentionUNet, WaterNet

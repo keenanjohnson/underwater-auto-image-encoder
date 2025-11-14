@@ -208,22 +208,22 @@ def main():
         epilog="""
 Examples:
   # Safe cleanup (keeps raw dataset, removes everything else)
-  python cleanup_training.py
+  python training/cleanup_training.py
 
   # Dry run (see what would be removed without actually removing)
-  python cleanup_training.py --dry-run
+  python training/cleanup_training.py --dry-run
 
   # Keep checkpoints and outputs (only remove intermediate files)
-  python cleanup_training.py --keep-checkpoints --keep-outputs
+  python training/cleanup_training.py --keep-checkpoints --keep-outputs
 
   # Force cleanup without confirmation prompt
-  python cleanup_training.py --force
+  python training/cleanup_training.py --force
 
   # Complete cleanup (remove EVERYTHING including raw dataset)
-  python cleanup_training.py --remove-raw-dataset --force
+  python training/cleanup_training.py --remove-raw-dataset --force
 
   # Remove specific custom directories
-  python cleanup_training.py --remove my_experiment1 my_experiment2
+  python training/cleanup_training.py --remove my_experiment1 my_experiment2
 
 Note: By default, the raw dataset (dataset_raw/) is preserved.
 Use --remove-raw-dataset to also remove the downloaded dataset.
