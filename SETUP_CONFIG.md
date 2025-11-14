@@ -21,7 +21,7 @@ Instead of passing many command-line arguments every time, you can store all you
 
 3. **Run the script:**
    ```bash
-   python setup_and_train.py
+   python training/setup_and_train.py
    ```
 
 That's it! The script will load settings from `setup_and_train_config.yaml` automatically.
@@ -92,13 +92,13 @@ You can override any config value with command-line arguments:
 
 ```bash
 # Use config file but override batch size
-python setup_and_train.py --batch-size 4
+python training/setup_and_train.py --batch-size 4
 
 # Use different config file
-python setup_and_train.py --config my_experiment.yaml
+python training/setup_and_train.py --config my_experiment.yaml
 
 # Override multiple settings
-python setup_and_train.py --batch-size 4 --epochs 100 --skip-download
+python training/setup_and_train.py --batch-size 4 --epochs 100 --skip-download
 ```
 
 Command-line arguments always take precedence over config file values.
@@ -168,7 +168,7 @@ setup_and_train_config.yaml
 cp setup_and_train_config.yaml experiments/experiment_01_baseline.yaml
 
 # Later, reuse that config
-python setup_and_train.py --config experiments/experiment_01_baseline.yaml
+python training/setup_and_train.py --config experiments/experiment_01_baseline.yaml
 ```
 
 ### Comparing experiments:
@@ -191,8 +191,8 @@ configs/
 
 Use them with:
 ```bash
-python setup_and_train.py --config configs/dev.yaml
-python setup_and_train.py --config configs/production.yaml
+python training/setup_and_train.py --config configs/dev.yaml
+python training/setup_and_train.py --config configs/production.yaml
 ```
 
 ## Validation
@@ -230,12 +230,12 @@ If no config file exists, the script uses these defaults:
 2. **Environment variable** (best for CI/CD):
    ```bash
    export HF_TOKEN=your_token_here
-   python setup_and_train.py
+   python training/setup_and_train.py
    ```
 
 3. **CLI argument** (use for one-off runs):
    ```bash
-   python setup_and_train.py --hf-token your_token_here
+   python training/setup_and_train.py --hf-token your_token_here
    ```
 
 ## Tips

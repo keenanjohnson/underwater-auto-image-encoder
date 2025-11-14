@@ -388,7 +388,7 @@ Examples:
             logger.info("Processing all sets")
 
         cmd = [
-            sys.executable, 'prepare_huggingface_dataset.py',
+            sys.executable, str(Path(__file__).parent.parent / 'dataset_prep' / 'prepare_huggingface_dataset.py'),
             *source_dirs,
             '--output', str(working_dir),
             '--split-ratio', str(split_ratio)
