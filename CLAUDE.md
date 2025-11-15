@@ -14,10 +14,10 @@ Underwater image enhancement ML pipeline that automates manual GoPro RAW editing
 ### Preprocessing GPR Files
 ```bash
 # Fast preprocessing (recommended) - uses parallel processing
-python preprocess_images_fast.py /path/to/gpr/files --output-dir processed
+python preprocessing/preprocess_images_fast.py /path/to/gpr/files --output-dir processed
 
 # Standard preprocessing
-python preprocess_images.py /path/to/gpr/files --output-dir processed
+python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir processed
 ```
 
 ### Dataset Preparation
@@ -28,13 +28,13 @@ python preprocess_images.py /path/to/gpr/files --output-dir processed
 ```bash
 # One command: download, prepare, crop, and train
 huggingface-cli login  # One-time setup
-python setup_and_train.py
+python training/setup_and_train.py
 
 # Custom parameters
-python setup_and_train.py --batch-size 4 --epochs 100 --skip-output-crop
+python training/setup_and_train.py --batch-size 4 --epochs 100 --skip-output-crop
 
 # Start fresh (cleanup and re-train)
-python cleanup_training.py --force && python setup_and_train.py --skip-download
+python training/cleanup_training.py --force && python training/setup_and_train.py --skip-download
 ```
 
 **Manual Step-by-Step:**
@@ -43,37 +43,37 @@ python cleanup_training.py --force && python setup_and_train.py --skip-download
 huggingface-cli login
 
 # Download
-python download_dataset.py --output dataset_raw
+python dataset_prep/download_dataset.py --output dataset_raw
 
 # Prepare
-python prepare_huggingface_dataset.py dataset_raw --output training_dataset
+python dataset_prep/prepare_huggingface_dataset.py dataset_raw --output training_dataset
 
 # Crop (REQUIRED - images are different sizes)
-python crop_tiff.py training_dataset/input --output-dir training_dataset/input_cropped --width 4606 --height 4030
+python dataset_prep/crop_tiff.py training_dataset/input --output-dir training_dataset/input_cropped --width 4606 --height 4030
 
 # Train
-python train.py --input-dir training_dataset/input_cropped --target-dir training_dataset/target
+python training/train.py --input-dir training_dataset/input_cropped --target-dir training_dataset/target
 ```
 
 #### From Local Files
 ```bash
 # Fast dataset preparation (recommended)
-python prepare_dataset_fast.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
+python dataset_prep/prepare_dataset_fast.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
 
 # Standard dataset preparation
-python prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
+python dataset_prep/prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
 
 # Create subset for testing
-python create_subset.py --input-dir dataset --output-dir dataset_subset --num-samples 100
+python dataset_prep/create_subset.py --input-dir dataset --output-dir dataset_subset --num-samples 100
 ```
 
 ### Training
 ```bash
 # Local training with U-Net (auto-detects GPU/CPU)
-python train.py
+python training/train.py
 
 # Resume training from checkpoint
-python train.py --resume checkpoints/checkpoint_epoch_10.pth
+python training/train.py --resume checkpoints/checkpoint_epoch_10.pth
 
 # Monitor training progress
 tensorboard --logdir logs
@@ -82,28 +82,28 @@ tensorboard --logdir logs
 ### Inference
 ```bash
 # Process single image
-python inference.py input.jpg --checkpoint checkpoints/best_model.pth
+python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth
 
 # Process directory with comparison
-python inference.py /path/to/images --checkpoint checkpoints/best_model.pth --compare
+python inference/inference.py /path/to/images --checkpoint checkpoints/best_model.pth --compare
 
 # Full resolution processing (uses tiled processing for >2048px)
-python inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-size
+python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-size
 ```
 
 ### Post-Processing
 ```bash
 # Apply denoising to enhanced images
-python denoise_tiff.py enhanced_images/ --output final_images/ --method bilateral
+python inference/denoise_tiff.py enhanced_images/ --output final_images/ --method bilateral
 
 # Compare denoising methods
-python compare_denoise_methods.py input.tiff --output comparison.png
+python inference/compare_denoise_methods.py input.tiff --output comparison.png
 ```
 
 ### Testing
 ```bash
 # Test preprocessing pipeline
-python test_preprocessing.py
+python tests/test_preprocessing.py
 
 # No formal test suite yet - evaluate visually using inference with --compare flag
 ```
@@ -111,16 +111,16 @@ python test_preprocessing.py
 ### Cleanup & Utilities
 ```bash
 # Preview what will be removed (safe)
-python cleanup_training.py --dry-run
+python training/cleanup_training.py --dry-run
 
 # Clean up all intermediate files (keeps raw dataset)
-python cleanup_training.py
+python training/cleanup_training.py
 
 # Complete cleanup including raw dataset
-python cleanup_training.py --remove-raw-dataset --force
+python training/cleanup_training.py --remove-raw-dataset --force
 
 # Keep specific artifacts
-python cleanup_training.py --keep-checkpoints --keep-outputs
+python training/cleanup_training.py --keep-checkpoints --keep-outputs
 
 # See full cleanup guide
 cat CLEANUP_GUIDE.md
@@ -136,23 +136,23 @@ Located in `src/models/unet_autoencoder.py`:
 - Combined L1+MSE loss (80%/20% split) for detail preservation and color consistency
 
 ### Data Pipeline
-1. **GPR Processing** (`preprocess_images.py`):
+1. **GPR Processing** ([preprocessing/preprocess_images.py](preprocessing/preprocess_images.py)):
    - Uses gpr_tools for GPR→DNG conversion
    - Center crops to 4606×4030
    - Saves as TIFF for lossless processing
 
-2. **Dataset Organization** (`prepare_dataset.py`):
+2. **Dataset Organization** ([dataset_prep/prepare_dataset.py](dataset_prep/prepare_dataset.py)):
    - Pairs raw/enhanced images
    - Creates train/val splits (80/20)
    - Handles file naming consistency
 
-3. **Training Loop** (`train.py`):
+3. **Training Loop** ([training/train.py](training/train.py)):
    - Loads config from `config.yaml`
    - Implements early stopping, learning rate scheduling
    - Saves best model based on validation loss
    - Generates validation comparisons every 5 epochs
 
-4. **Inference** (`inference.py`):
+4. **Inference** ([inference/inference.py](inference/inference.py)):
    - Handles arbitrary input sizes via tiled processing
    - Supports batch processing of directories
    - Creates side-by-side comparisons

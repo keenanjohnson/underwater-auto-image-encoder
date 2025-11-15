@@ -29,20 +29,20 @@ huggingface-cli login
 # Follow the prompts and paste your token from https://huggingface.co/settings/tokens
 
 # Then download the dataset
-python download_dataset.py --output dataset_raw
+python dataset_prep/download_dataset.py --output dataset_raw
 ```
 
 **Alternative authentication methods:**
 ```bash
 # Method 1: Environment variable
 export HF_TOKEN=hf_xxxxxxxxxxxxx
-python download_dataset.py --output dataset_raw
+python dataset_prep/download_dataset.py --output dataset_raw
 
 # Method 2: Pass token directly
-python download_dataset.py --output dataset_raw --token hf_xxxxxxxxxxxxx
+python dataset_prep/download_dataset.py --output dataset_raw --token hf_xxxxxxxxxxxxx
 
 # Method 3: Different dataset
-python download_dataset.py --repo-id Seattle-Aquarium/Seattle_Aquarium_benthic_imagery --output my_dataset
+python dataset_prep/download_dataset.py --repo-id Seattle-Aquarium/Seattle_Aquarium_benthic_imagery --output my_dataset
 ```
 
 **Smart Download Features**:
@@ -55,7 +55,7 @@ The download script will automatically detect the dataset structure and provide 
 **Customize retry behavior** (if needed):
 ```bash
 # Increase retries for unstable connections
-python download_dataset.py --max-retries 10 --retry-delay 30
+python dataset_prep/download_dataset.py --max-retries 10 --retry-delay 30
 ```
 
 ### 2. Prepare Dataset for Training
@@ -64,7 +64,7 @@ After downloading, organize the dataset for training using the `prepare_huggingf
 
 ```bash
 # Process all sets in the downloaded dataset
-python prepare_huggingface_dataset.py dataset_raw --output training_dataset
+python dataset_prep/prepare_huggingface_dataset.py dataset_raw --output training_dataset
 
 # This will:
 # - Find all set01/, set02/, etc. directories
@@ -76,7 +76,7 @@ python prepare_huggingface_dataset.py dataset_raw --output training_dataset
 ### 3. Start Training
 
 ```bash
-python train.py \
+python training/train.py \
   --input-dir training_dataset/input \
   --target-dir training_dataset/target \
   --image-size 1024 \

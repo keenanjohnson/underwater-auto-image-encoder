@@ -51,17 +51,17 @@ Settings are applied in this order (later overrides earlier):
 
 ### Basic usage (uses config file):
 ```bash
-python setup_and_train.py
+python training/setup_and_train.py
 ```
 
 ### Override specific settings:
 ```bash
-python setup_and_train.py --batch-size 4 --epochs 100
+python training/setup_and_train.py --batch-size 4 --epochs 100
 ```
 
 ### Use different config file:
 ```bash
-python setup_and_train.py --config experiments/experiment_01.yaml
+python training/setup_and_train.py --config experiments/experiment_01.yaml
 ```
 
 ### Save experiment configurations:
@@ -70,7 +70,7 @@ python setup_and_train.py --config experiments/experiment_01.yaml
 cp setup_and_train_config.yaml experiments/high_batch.yaml
 # Edit experiments/high_batch.yaml
 # Run with that config
-python setup_and_train.py --config experiments/high_batch.yaml
+python training/setup_and_train.py --config experiments/high_batch.yaml
 ```
 
 ## Benefits
@@ -118,7 +118,7 @@ python setup_and_train.py --config experiments/high_batch.yaml
 
 ### Before (old way):
 ```bash
-python setup_and_train.py \
+python training/setup_and_train.py \
   --dataset-dir dataset_raw \
   --working-dir training_dataset \
   --batch-size 8 \
@@ -148,12 +148,12 @@ training:
 
 2. Run with simple command:
 ```bash
-python setup_and_train.py
+python training/setup_and_train.py
 ```
 
 3. Override when needed:
 ```bash
-python setup_and_train.py --batch-size 4
+python training/setup_and_train.py --batch-size 4
 ```
 
 ## Backward Compatibility
@@ -178,6 +178,6 @@ Tested successfully:
 Users should:
 1. Copy `setup_and_train_config_example.yaml` to `setup_and_train_config.yaml`
 2. Customize the config for their environment
-3. Run `python setup_and_train.py`
+3. Run `python training/setup_and_train.py`
 4. Save experiment configs in `experiments/` directory
 5. Version control experiment configs in git

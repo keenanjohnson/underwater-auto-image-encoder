@@ -1,17 +1,17 @@
 # Training Script Documentation
 
-This document explains how to use the standalone `train.py` script, which replaces the Jupyter notebook workflow.
+This document explains how to use the standalone `training/train.py` script, which replaces the Jupyter notebook workflow.
 
 ## Overview
 
-The `train.py` script provides a command-line interface for training the underwater image enhancement model with the same functionality as the Jupyter notebook, but with better flexibility and integration into automated workflows.
+The `training/train.py` script provides a command-line interface for training the underwater image enhancement model with the same functionality as the Jupyter notebook, but with better flexibility and integration into automated workflows.
 
 ## Quick Start
 
 ### Basic Usage (1024×1024 patches)
 
 ```bash
-python train.py \
+python training/train.py \
   --input-dir dataset/input_GPR \
   --target-dir dataset/human_output_JPEG \
   --image-size 1024 \
@@ -22,7 +22,7 @@ python train.py \
 ### Full-Size Training (requires 32GB+ GPU)
 
 ```bash
-python train.py \
+python training/train.py \
   --input-dir dataset/input_GPR \
   --target-dir dataset/human_output_JPEG \
   --image-size 0 \
@@ -80,7 +80,7 @@ python train.py \
 mkdir -p output checkpoints
 
 # Train model
-python train.py \
+python training/train.py \
   --input-dir dataset/input_GPR \
   --target-dir dataset/human_output_JPEG \
   --image-size 1024 \
@@ -99,7 +99,7 @@ python train.py \
 
 ```bash
 # If you have a custom train/val split file
-python train.py \
+python training/train.py \
   --input-dir dataset/input_GPR \
   --target-dir dataset/human_output_JPEG \
   --split-file dataset/my_split.txt \
@@ -111,7 +111,7 @@ python train.py \
 
 ```bash
 # Resume training from a previous checkpoint
-python train.py \
+python training/train.py \
   --input-dir dataset/input_GPR \
   --target-dir dataset/human_output_JPEG \
   --resume checkpoints/latest_checkpoint.pth \
@@ -122,7 +122,7 @@ python train.py \
 
 ```bash
 # Train on full-resolution images (4606×4030)
-python train.py \
+python training/train.py \
   --input-dir dataset/input_GPR \
   --target-dir dataset/human_output_JPEG \
   --image-size 0 \
@@ -137,7 +137,7 @@ python train.py \
 
 ```bash
 # Fast training for testing (256×256 patches)
-python train.py \
+python training/train.py \
   --input-dir dataset/input_GPR \
   --target-dir dataset/human_output_JPEG \
   --image-size 256 \
@@ -227,12 +227,12 @@ The saved models include configuration that the inference script uses automatica
 
 ```bash
 # Process single image
-python inference.py input.jpg \
+python inference/inference.py input.jpg \
   --checkpoint output/best_model.pth \
   --output enhanced.tiff
 
 # Process directory
-python inference.py input_dir/ \
+python inference/inference.py input_dir/ \
   --checkpoint output/best_model.pth \
   --output output_dir/
 ```
@@ -277,10 +277,10 @@ RuntimeError: CUDA out of memory
 **Solution:** Reduce batch size or image size:
 ```bash
 # Reduce batch size
-python train.py --batch-size 8 ...
+python training/train.py --batch-size 8 ...
 
 # Or use smaller images
-python train.py --image-size 512 ...
+python training/train.py --image-size 512 ...
 ```
 
 ### Split File Format
@@ -334,7 +334,7 @@ After training:
 
 1. **Evaluate the model:**
    ```bash
-   python inference.py test_image.tiff \
+   python inference/inference.py test_image.tiff \
      --checkpoint output/best_model.pth \
      --compare
    ```

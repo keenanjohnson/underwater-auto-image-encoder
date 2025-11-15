@@ -97,22 +97,22 @@ def main():
         epilog="""
 Examples:
   # Basic usage (loads from setup_and_train_config.yaml)
-  python setup_and_train.py
+  python training/setup_and_train.py
 
   # Use custom config file
-  python setup_and_train.py --config my_config.yaml
+  python training/setup_and_train.py --config my_config.yaml
 
   # Override specific settings via command line
-  python setup_and_train.py --batch-size 4 --epochs 100
+  python training/setup_and_train.py --batch-size 4 --epochs 100
 
   # Skip download if already exists
-  python setup_and_train.py --skip-download
+  python training/setup_and_train.py --skip-download
 
   # Process only specific sets
-  python setup_and_train.py --sets set01 set02
+  python training/setup_and_train.py --sets set01 set02
 
   # Force output cropping (rarely needed)
-  python setup_and_train.py --crop-output
+  python training/setup_and_train.py --crop-output
         """
     )
 
@@ -347,7 +347,7 @@ Examples:
         logger.info("\n📥 STEP 1/4: Downloading dataset from HuggingFace...")
 
         cmd = [
-            sys.executable, 'download_dataset.py',
+            sys.executable, str(Path(__file__).parent.parent / 'dataset_prep' / 'download_dataset.py'),
             '--repo-id', repo_id,
             '--output', str(dataset_dir)
         ]
@@ -388,7 +388,7 @@ Examples:
             logger.info("Processing all sets")
 
         cmd = [
-            sys.executable, 'prepare_huggingface_dataset.py',
+            sys.executable, str(Path(__file__).parent.parent / 'dataset_prep' / 'prepare_huggingface_dataset.py'),
             *source_dirs,
             '--output', str(working_dir),
             '--split-ratio', str(split_ratio)
@@ -417,7 +417,7 @@ Examples:
         # Crop input images
         logger.info(f"Cropping input images to {crop_width}×{crop_height}...")
         cmd = [
-            sys.executable, 'crop_tiff.py',
+            sys.executable, str(Path(__file__).parent.parent / 'dataset_prep' / 'crop_tiff.py'),
             str(input_dir),
             '--output-dir', str(input_cropped_dir),
             '--width', str(crop_width),
@@ -429,7 +429,7 @@ Examples:
         if crop_output:
             logger.info(f"Cropping target images to {crop_width}×{crop_height}...")
             cmd = [
-                sys.executable, 'crop_tiff.py',
+                sys.executable, str(Path(__file__).parent.parent / 'dataset_prep' / 'crop_tiff.py'),
                 str(target_dir),
                 '--output-dir', str(target_cropped_dir),
                 '--width', str(crop_width),
@@ -460,7 +460,7 @@ Examples:
         logger.info("\n✓ Dataset preparation complete!")
         logger.info("="*80)
         logger.info("Dataset is ready for training. To start training, run:")
-        logger.info(f"  python train.py \\")
+        logger.info(f"  python training/train.py \\")
         logger.info(f"    --input-dir {input_cropped_dir} \\")
         logger.info(f"    --target-dir {target_cropped_dir} \\")
         logger.info(f"    --image-size {image_size} \\")
@@ -473,7 +473,7 @@ Examples:
     logger.info("\n🚀 STEP 4/4: Starting training...")
 
     cmd = [
-        sys.executable, 'train.py',
+        sys.executable, str(Path(__file__).parent / 'train.py'),
         '--input-dir', str(input_cropped_dir),
         '--target-dir', str(target_cropped_dir),
         '--image-size', str(image_size),

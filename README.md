@@ -97,13 +97,13 @@ If you're working on a remote VM or want to use a pre-prepared dataset, you can 
 pip install huggingface_hub
 
 # Download the dataset (downloads to ./dataset by default)
-python download_dataset.py
+python dataset_prep/download_dataset.py
 
 # Download to a custom directory
-python download_dataset.py --output my_dataset
+python dataset_prep/download_dataset.py --output my_dataset
 
 # Download a different dataset
-python download_dataset.py --repo-id username/dataset-name
+python dataset_prep/download_dataset.py --repo-id username/dataset-name
 ```
 
 The script downloads the dataset with the correct structure:
@@ -116,7 +116,7 @@ dataset/
 **For private datasets**, authenticate first:
 ```bash
 huggingface-cli login
-python download_dataset.py --repo-id username/private-dataset
+python dataset_prep/download_dataset.py --repo-id username/private-dataset
 ```
 
 After downloading, you can skip directly to training (step 3 below).
@@ -126,7 +126,7 @@ After downloading, you can skip directly to training (step 3 below).
 #### 1. Preprocess GPR Files
 ```bash
 # Convert and crop GPR files to training format
-python preprocess_images.py /path/to/gpr/files --output-dir processed
+python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir processed
 
 # This creates:
 # processed/raw/      - DNG files from GPR conversion
@@ -138,7 +138,7 @@ python preprocess_images.py /path/to/gpr/files --output-dir processed
 **Option A: From preprocessed GPR files**
 ```bash
 # Organize paired raw/enhanced images for training
-python prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
+python dataset_prep/prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
 
 # Creates organized dataset structure:
 # dataset/input/   - Raw images (renamed consistently)
@@ -150,15 +150,15 @@ python prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg
 ```bash
 # Step 1: Crop images to standard dimensions (4606×4030)
 # This ensures all images are the correct size for training
-python crop_tiff.py my_dataset/ --output-dir my_dataset_cropped --preserve-format
+python dataset_prep/crop_tiff.py my_dataset/ --output-dir my_dataset_cropped --preserve-format
 
 # Step 2: Organize into training structure
 # If you have a dataset where input (.tif) and output (.jpg) files
 # are in the same directory with matching filenames
-python prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf
+python dataset_prep/prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf
 
 # Use --symlink to save disk space (creates symbolic links instead of copying)
-python prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf --symlink
+python dataset_prep/prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf --symlink
 
 # Creates the same organized structure:
 # dataset_hf/input/   - Raw images (.tif files)
@@ -171,10 +171,10 @@ python prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf --
 ```bash
 # Train with standard U-Net (auto-detects GPU/CPU)
 # Must specify --input-dir and --target-dir
-python train.py --input-dir dataset/input --target-dir dataset/target
+python training/train.py --input-dir dataset/input --target-dir dataset/target
 
 # With custom settings
-python train.py \
+python training/train.py \
   --input-dir dataset/input \
   --target-dir dataset/target \
   --image-size 512 \
@@ -182,7 +182,7 @@ python train.py \
   --epochs 50
 
 # Resume from checkpoint
-python train.py \
+python training/train.py \
   --input-dir dataset/input \
   --target-dir dataset/target \
   --resume checkpoints/latest_checkpoint.pth
@@ -196,16 +196,16 @@ For detailed training options and Google Colab setup, see [TRAINING.md](TRAINING
 #### 4. Run Inference
 ```bash
 # Process single image
-python inference.py input.jpg --checkpoint checkpoints/best_model.pth
+python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth
 
 # Process entire directory
-python inference.py /path/to/images --checkpoint checkpoints/best_model.pth --output enhanced_images
+python inference/inference.py /path/to/images --checkpoint checkpoints/best_model.pth --output enhanced_images
 
 # Create side-by-side comparisons
-python inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
+python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
 
 # Process at full resolution (uses tiled processing for large images)
-python inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-size
+python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-size
 ```
 
 **Note**: For large images (>2048px), the inference script automatically uses tiled processing to avoid memory issues. This processes the image in overlapping tiles and blends them seamlessly.
@@ -213,19 +213,19 @@ python inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-siz
 #### 5. Post-Process with Denoising (Optional)
 ```bash
 # Apply denoising to TIFF outputs from inference
-python denoise_tiff.py enhanced_images/ --output final_images/
+python inference/denoise_tiff.py enhanced_images/ --output final_images/
 
 # Use specific denoising algorithm (options: bilateral, nlmeans, gaussian, median, tv_chambolle, wavelet, bm3d_approximation)
-python denoise_tiff.py enhanced_images/ --method bilateral --output final_images/
+python inference/denoise_tiff.py enhanced_images/ --method bilateral --output final_images/
 
 # Process single TIFF file with Non-Local Means (default)
-python denoise_tiff.py input.tiff --output output.tiff --nlmeans-h 0.1
+python inference/denoise_tiff.py input.tiff --output output.tiff --nlmeans-h 0.1
 
 # Use bilateral filter (recommended for underwater images)
-python denoise_tiff.py input.tiff --method bilateral --bilateral-sigma-color 75
+python inference/denoise_tiff.py input.tiff --method bilateral --bilateral-sigma-color 75
 
 # Preserve original value range
-python denoise_tiff.py input.tiff --preserve-range
+python inference/denoise_tiff.py input.tiff --preserve-range
 ```
 
 
@@ -246,7 +246,7 @@ The model uses a standard U-Net architecture trained on paired raw/enhanced unde
 
 **Quick start:**
 ```bash
-python train.py
+python training/train.py
 ```
 
 **Key features:**

@@ -11,7 +11,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.converters.gpr_converter import GPRConverter
-from inference import Inferencer
+from inference.inference import Inferencer
 
 logger = logging.getLogger(__name__)
 
