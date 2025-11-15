@@ -345,9 +345,6 @@ def main():
     parser.add_argument('--l1-weight', type=float, default=0.8, help='L1 loss weight (default: 0.8)')
     parser.add_argument('--mse-weight', type=float, default=0.2, help='MSE loss weight (default: 0.2)')
 
-    # Early stopping
-    parser.add_argument('--patience', type=int, default=10, help='Early stopping patience (default: 10)')
-
     args = parser.parse_args()
 
     # Set random seeds
@@ -459,7 +456,6 @@ def main():
     # Training state
     start_epoch = 0
     best_val_loss = float('inf')
-    patience_counter = 0
     train_losses = []
     val_losses = []
     train_psnrs = []
@@ -543,20 +539,12 @@ def main():
 
             torch.save(checkpoint, best_model_path)
             logger.info(f"✓ Saved best model: {best_model_path}")
-            patience_counter = 0
-        else:
-            patience_counter += 1
 
         # Periodic checkpoint
         if (epoch + 1) % 5 == 0:
             periodic_checkpoint = checkpoint_dir / f'checkpoint_epoch_{epoch+1}.pth'
             torch.save(checkpoint, periodic_checkpoint)
             logger.info(f"✓ Saved periodic checkpoint: {periodic_checkpoint}")
-
-        # Early stopping
-        if patience_counter >= args.patience:
-            logger.info(f"Early stopping triggered after {epoch+1} epochs")
-            break
 
     # Save final model
     final_model_path = output_dir / 'final_model.pth'
