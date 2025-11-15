@@ -77,6 +77,7 @@ jobs:
         sudo apt-get install -y \
           build-essential \
           cmake \
+          python3-tk \
           libgl1 \
           libglib2.0-0 \
           libsm6 \
