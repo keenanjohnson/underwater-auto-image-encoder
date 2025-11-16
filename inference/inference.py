@@ -322,26 +322,26 @@ class Inferencer:
                 # Create the blend mask
                 mask = np.ones((tile_height, tile_width), dtype=np.float32)
 
-                # Apply gradients to edges
+                # Apply gradients to edges (handle small tiles properly)
                 if blend_left > 0:
-                    gradient = np.linspace(0, 1, blend_left)
-                    mask[:, :blend_left] = np.minimum(mask[:, :blend_left], gradient)
+                    actual_blend_left = min(blend_left, tile_width)
+                    gradient = np.linspace(0, 1, actual_blend_left)
+                    mask[:, :actual_blend_left] = np.minimum(mask[:, :actual_blend_left], gradient)
 
                 if blend_right > 0:
-                    gradient = np.linspace(1, 0, blend_right)
-                    end_idx = tile_width
-                    start_idx = max(0, end_idx - blend_right)
-                    mask[:, start_idx:end_idx] = np.minimum(mask[:, start_idx:end_idx], gradient[:end_idx-start_idx])
+                    actual_blend_right = min(blend_right, tile_width)
+                    gradient = np.linspace(1, 0, actual_blend_right)
+                    mask[:, -actual_blend_right:] = np.minimum(mask[:, -actual_blend_right:], gradient)
 
                 if blend_top > 0:
-                    gradient = np.linspace(0, 1, blend_top).reshape(-1, 1)
-                    mask[:blend_top, :] = np.minimum(mask[:blend_top, :], gradient)
+                    actual_blend_top = min(blend_top, tile_height)
+                    gradient = np.linspace(0, 1, actual_blend_top).reshape(-1, 1)
+                    mask[:actual_blend_top, :] = np.minimum(mask[:actual_blend_top, :], gradient)
 
                 if blend_bottom > 0:
-                    gradient = np.linspace(1, 0, blend_bottom).reshape(-1, 1)
-                    end_idx = tile_height
-                    start_idx = max(0, end_idx - blend_bottom)
-                    mask[start_idx:end_idx, :] = np.minimum(mask[start_idx:end_idx, :], gradient[:end_idx-start_idx])
+                    actual_blend_bottom = min(blend_bottom, tile_height)
+                    gradient = np.linspace(1, 0, actual_blend_bottom).reshape(-1, 1)
+                    mask[-actual_blend_bottom:, :] = np.minimum(mask[-actual_blend_bottom:, :], gradient)
 
                 # Apply weighted blending (broadcast mask across RGB channels)
                 output_array[y:y_end, x:x_end] += enhanced_array * mask[:, :, np.newaxis]
