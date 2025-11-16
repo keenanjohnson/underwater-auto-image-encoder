@@ -365,7 +365,7 @@ class Inferencer:
                 # Apply gradients to edges
                 if blend_left > 0:
                     gradient = np.linspace(0, 1, blend_left)
-                    mask[:, :blend_left] = gradient
+                    mask[:, :blend_left] = np.minimum(mask[:, :blend_left], gradient)
 
                 if blend_right > 0:
                     gradient = np.linspace(1, 0, blend_right)
