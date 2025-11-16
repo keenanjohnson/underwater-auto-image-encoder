@@ -252,46 +252,6 @@ class Inferencer:
             tensor = torch.nn.functional.pad(tensor, padding, mode='reflect')
         
         return tensor, (pad_h, pad_w)
-    
-    def create_blend_mask(self, tile_width, tile_height, overlap, blend_width=None):
-        """Create a feathering mask for smooth tile blending
-
-        Args:
-            tile_width: Width of the tile
-            tile_height: Height of the tile
-            overlap: Overlap size in pixels
-            blend_width: Width of the feathering region (defaults to overlap)
-
-        Returns:
-            numpy array of shape (tile_height, tile_width) with blend weights [0, 1]
-        """
-        if blend_width is None:
-            blend_width = overlap
-
-        mask = np.ones((tile_height, tile_width), dtype=np.float32)
-
-        # Create linear gradients for blending edges
-        # Left edge
-        if blend_width > 0:
-            gradient = np.linspace(0, 1, blend_width)
-            mask[:, :blend_width] = np.minimum(mask[:, :blend_width], gradient)
-
-        # Right edge
-        if blend_width > 0 and blend_width <= tile_width:
-            gradient = np.linspace(1, 0, blend_width)
-            mask[:, -blend_width:] = np.minimum(mask[:, -blend_width:], gradient)
-
-        # Top edge
-        if blend_width > 0:
-            gradient = np.linspace(0, 1, blend_width).reshape(-1, 1)
-            mask[:blend_width, :] = np.minimum(mask[:blend_width, :], gradient)
-
-        # Bottom edge
-        if blend_width > 0 and blend_width <= tile_height:
-            gradient = np.linspace(1, 0, blend_width).reshape(-1, 1)
-            mask[-blend_width:, :] = np.minimum(mask[-blend_width:, :], gradient)
-
-        return mask
 
     def process_image_tiled(self, image_path: Path, tile_size=1024, overlap=128, progress_callback=None):
         """Process large image using tiling with seamless blending to avoid artifacts
