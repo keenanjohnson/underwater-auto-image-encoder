@@ -253,32 +253,73 @@ class Inferencer:
         
         return tensor, (pad_h, pad_w)
     
+    def create_blend_mask(self, tile_width, tile_height, overlap, blend_width=None):
+        """Create a feathering mask for smooth tile blending
+
+        Args:
+            tile_width: Width of the tile
+            tile_height: Height of the tile
+            overlap: Overlap size in pixels
+            blend_width: Width of the feathering region (defaults to overlap)
+
+        Returns:
+            numpy array of shape (tile_height, tile_width) with blend weights [0, 1]
+        """
+        if blend_width is None:
+            blend_width = overlap
+
+        mask = np.ones((tile_height, tile_width), dtype=np.float32)
+
+        # Create linear gradients for blending edges
+        # Left edge
+        if blend_width > 0:
+            gradient = np.linspace(0, 1, blend_width)
+            mask[:, :blend_width] = np.minimum(mask[:, :blend_width], gradient)
+
+        # Right edge
+        if blend_width > 0 and blend_width <= tile_width:
+            gradient = np.linspace(1, 0, blend_width)
+            mask[:, -blend_width:] = np.minimum(mask[:, -blend_width:], gradient)
+
+        # Top edge
+        if blend_width > 0:
+            gradient = np.linspace(0, 1, blend_width).reshape(-1, 1)
+            mask[:blend_width, :] = np.minimum(mask[:blend_width, :], gradient)
+
+        # Bottom edge
+        if blend_width > 0 and blend_width <= tile_height:
+            gradient = np.linspace(1, 0, blend_width).reshape(-1, 1)
+            mask[-blend_width:, :] = np.minimum(mask[-blend_width:, :], gradient)
+
+        return mask
+
     def process_image_tiled(self, image_path: Path, tile_size=1024, overlap=128, progress_callback=None):
-        """Process large image using tiling to avoid memory issues
-        
+        """Process large image using tiling with seamless blending to avoid artifacts
+
         Args:
             image_path: Path to input image
             tile_size: Size of each tile
-            overlap: Overlap between tiles
+            overlap: Overlap between tiles (used for blending)
             progress_callback: Optional callback(message) for progress updates
         """
         img = Image.open(image_path).convert('RGB')
         original_size = img.size
         width, height = original_size
-        
-        logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles")
+
+        logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles and {overlap}px overlap")
         if progress_callback:
             progress_callback(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles")
-        
-        # Create output image
-        output_img = Image.new('RGB', original_size)
-        
+
+        # Create accumulation buffers for weighted blending
+        output_array = np.zeros((height, width, 3), dtype=np.float32)
+        weight_array = np.zeros((height, width), dtype=np.float32)
+
         # Calculate total tiles for progress tracking
         tiles_x = (width + tile_size - overlap - 1) // (tile_size - overlap)
         tiles_y = (height + tile_size - overlap - 1) // (tile_size - overlap)
         total_tiles = tiles_x * tiles_y
         current_tile = 0
-        
+
         # Process tiles
         for y in range(0, height, tile_size - overlap):
             for x in range(0, width, tile_size - overlap):
@@ -286,47 +327,81 @@ class Inferencer:
                 # Define tile boundaries
                 x_end = min(x + tile_size, width)
                 y_end = min(y + tile_size, height)
-                
+
+                tile_width = x_end - x
+                tile_height = y_end - y
+
                 # Extract tile
                 tile = img.crop((x, y, x_end, y_end))
-                
+
                 # Process tile
                 input_tensor = self.transform(tile).unsqueeze(0).to(self.device)
                 padded_tensor, (pad_h, pad_w) = self.pad_to_multiple(input_tensor, multiple=32)
-                
+
                 with torch.no_grad():
                     output_tensor = self.model(padded_tensor)
-                
+
                 # Remove padding
                 if pad_h > 0 or pad_w > 0:
                     _, _, h, w = input_tensor.shape
                     output_tensor = output_tensor[:, :, :h, :w]
-                
+
                 output_tensor = output_tensor.squeeze(0).cpu()
                 enhanced_tile = self.inverse_transform(output_tensor)
-                
-                # Handle overlap blending for smoother results
-                if overlap > 0 and (x > 0 or y > 0):
-                    # Simple paste for now - could add feathering
-                    paste_x = x + overlap // 2 if x > 0 else x
-                    paste_y = y + overlap // 2 if y > 0 else y
-                    paste_x_end = x_end - overlap // 2 if x_end < width else x_end
-                    paste_y_end = y_end - overlap // 2 if y_end < height else y_end
-                    
-                    crop_x = overlap // 2 if x > 0 else 0
-                    crop_y = overlap // 2 if y > 0 else 0
-                    crop_x_end = enhanced_tile.size[0] - (overlap // 2 if x_end < width else 0)
-                    crop_y_end = enhanced_tile.size[1] - (overlap // 2 if y_end < height else 0)
-                    
-                    enhanced_tile_cropped = enhanced_tile.crop((crop_x, crop_y, crop_x_end, crop_y_end))
-                    output_img.paste(enhanced_tile_cropped, (paste_x, paste_y))
-                else:
-                    output_img.paste(enhanced_tile, (x, y))
-                
+
+                # Convert to numpy array for blending
+                enhanced_array = np.array(enhanced_tile, dtype=np.float32)
+
+                # Create blend mask for this tile
+                # Determine which edges need blending
+                blend_left = overlap if x > 0 else 0
+                blend_right = overlap if x_end < width else 0
+                blend_top = overlap if y > 0 else 0
+                blend_bottom = overlap if y_end < height else 0
+
+                # Create the blend mask
+                mask = np.ones((tile_height, tile_width), dtype=np.float32)
+
+                # Apply gradients to edges
+                if blend_left > 0:
+                    gradient = np.linspace(0, 1, blend_left)
+                    mask[:, :blend_left] = gradient
+
+                if blend_right > 0:
+                    gradient = np.linspace(1, 0, blend_right)
+                    end_idx = tile_width
+                    start_idx = max(0, end_idx - blend_right)
+                    mask[:, start_idx:end_idx] = np.minimum(mask[:, start_idx:end_idx], gradient[:end_idx-start_idx])
+
+                if blend_top > 0:
+                    gradient = np.linspace(0, 1, blend_top).reshape(-1, 1)
+                    mask[:blend_top, :] = np.minimum(mask[:blend_top, :], gradient)
+
+                if blend_bottom > 0:
+                    gradient = np.linspace(1, 0, blend_bottom).reshape(-1, 1)
+                    end_idx = tile_height
+                    start_idx = max(0, end_idx - blend_bottom)
+                    mask[start_idx:end_idx, :] = np.minimum(mask[start_idx:end_idx, :], gradient[:end_idx-start_idx])
+
+                # Apply weighted blending
+                for c in range(3):  # RGB channels
+                    output_array[y:y_end, x:x_end, c] += enhanced_array[:, :, c] * mask
+                weight_array[y:y_end, x:x_end] += mask
+
                 logger.info(f"Processed tile ({x}, {y}) to ({x_end}, {y_end})")
                 if progress_callback:
                     progress_callback(f"Processed tile {current_tile}/{total_tiles} ({x}, {y}) to ({x_end}, {y_end})")
-        
+
+        # Normalize by weights to get final image
+        # Avoid division by zero (shouldn't happen, but be safe)
+        weight_array = np.maximum(weight_array, 1e-8)
+        for c in range(3):
+            output_array[:, :, c] /= weight_array
+
+        # Convert back to PIL Image
+        output_array = np.clip(output_array, 0, 255).astype(np.uint8)
+        output_img = Image.fromarray(output_array, 'RGB')
+
         return output_img
 
     def process_image(self, image_path: Path, output_path: Path = None, progress_callback=None):
