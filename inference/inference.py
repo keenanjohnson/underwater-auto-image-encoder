@@ -343,9 +343,8 @@ class Inferencer:
                     start_idx = max(0, end_idx - blend_bottom)
                     mask[start_idx:end_idx, :] = np.minimum(mask[start_idx:end_idx, :], gradient[:end_idx-start_idx])
 
-                # Apply weighted blending
-                for c in range(3):  # RGB channels
-                    output_array[y:y_end, x:x_end, c] += enhanced_array[:, :, c] * mask
+                # Apply weighted blending (broadcast mask across RGB channels)
+                output_array[y:y_end, x:x_end] += enhanced_array * mask[:, :, np.newaxis]
                 weight_array[y:y_end, x:x_end] += mask
 
                 logger.info(f"Processed tile ({x}, {y}) to ({x_end}, {y_end})")
@@ -355,8 +354,7 @@ class Inferencer:
         # Normalize by weights to get final image
         # Avoid division by zero (shouldn't happen, but be safe)
         weight_array = np.maximum(weight_array, 1e-8)
-        for c in range(3):
-            output_array[:, :, c] /= weight_array
+        output_array /= weight_array[:, :, np.newaxis]
 
         # Convert back to PIL Image
         output_array = np.clip(output_array, 0, 255).astype(np.uint8)
