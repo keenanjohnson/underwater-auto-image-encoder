@@ -394,16 +394,8 @@ class UnderwaterEnhancerApp(ctk.CTk):
         try:
             # Initialize processor
             model_path = self.model_path_var.get()
-            # Check if config.yaml exists in the same directory as the model
-            model_dir = Path(model_path).parent
-            config_path = model_dir / "config.yaml"
-            if not config_path.exists():
-                # Try in the project root
-                config_path = Path("config.yaml")
-                if not config_path.exists():
-                    config_path = None
-            
-            self.processor = ImageProcessor(model_path, str(config_path) if config_path else None)
+            # Config is optional - Inferencer creates default from checkpoint if not provided
+            self.processor = ImageProcessor(model_path, config_path=None)
             
             # Log GPR support status
             if self.processor.gpr_support:

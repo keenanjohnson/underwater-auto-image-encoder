@@ -147,7 +147,7 @@ Located in `src/models/unet_autoencoder.py`:
    - Handles file naming consistency
 
 3. **Training Loop** ([training/train.py](training/train.py)):
-   - Loads config from `config.yaml`
+   - Uses command-line arguments or setup_and_train_config.yaml for configuration
    - Implements early stopping, learning rate scheduling
    - Saves best model based on validation loss
    - Generates validation comparisons every 5 epochs
@@ -193,10 +193,14 @@ photos/                 # Full dataset (3414 pairs)
 └── human_output_JPEG/
 ```
 
-## Configuration (config.yaml)
-Key settings:
+## Configuration
+Training configuration is managed through:
+- **setup_and_train_config.yaml** - Main configuration file (see [SETUP_CONFIG.md](SETUP_CONFIG.md))
+- **Command-line arguments** - Override config file settings
+
+Key default settings:
 - `batch_size`: 16 (reduce for memory issues)
-- `image_size`: [256, 256] (training patches)
+- `image_size`: 512 (training patches)
 - `learning_rate`: 0.0001
 - `epochs`: 50
 - Loss weights: L1=0.8, MSE=0.2
