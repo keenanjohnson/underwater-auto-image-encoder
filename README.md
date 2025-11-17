@@ -1,271 +1,188 @@
 # Underwater Image Enhancement with ML
 
-An automated machine learning pipeline that replaces manual image editing for underwater GoPro images captured during ROV surveys. The system converts RAW GPR files to enhanced JPEGs that match manual Adobe Lightroom editing quality.
+Automated machine learning pipeline that replaces manual image editing for underwater GoPro images captured during ROV surveys. Converts RAW GPR files to enhanced images matching manual Adobe Lightroom editing quality.
 
 ![Underwater Image Enhancer GUI](gui_screenshot.png)
 
-## 🖥️ Desktop Application (GUI)
+## 🎯 Project Overview
 
-**For most users: A user-friendly desktop application is available that requires no programming knowledge.**
+**Purpose**: Automate time-intensive manual photo editing for Seattle Aquarium ROV surveys
+**Input**: GoPro RAW (GPR) files or JPEG/TIFF images
+**Output**: Enhanced underwater images with improved color and clarity
+**Method**: U-Net neural network trained on manually-edited image pairs
 
-### Download and Run
-```bash
-# Windows
-Download UnderwaterEnhancer.exe from releases
+## 🚀 Quick Start
 
-# macOS  
-Download UnderwaterEnhancer.app from releases
+### For End Users: GUI Application
 
-# Linux
-Download UnderwaterEnhancer from releases
-```
+**No programming required** - Desktop application available for Windows, macOS, and Linux.
 
-### GUI Models
+👉 **[See GUI Documentation](gui/README.md)**
 
-You can use models trained from this repo to process images.
+**Quick steps:**
+1. Download the application for your platform
+2. Download a trained model (.pth file)
+3. Drag & drop images to enhance
 
-For example, two different models are provided in this google drive folder:
-https://drive.google.com/drive/u/0/folders/1Vdctr52LTxoS6eecFiGS5LROZYSqJ3vl
+### For Developers: Training & Command Line
 
-Models are in the .pth format and can be loaded into the GUI.
+Train custom models or integrate into automated workflows.
 
-#### Windows Security Warning
-When running the Windows executable for the first time, you may see a security warning from Windows Defender SmartScreen. This occurs because the application is not digitally signed. To run the application:
-
-1. Click **"More info"** on the Windows Defender SmartScreen warning
-2. Click **"Run anyway"** at the bottom of the dialog
-
-The application is safe to use. This warning appears for all unsigned executables and will decrease over time as more users run the application.
-
-### GUI Features
-- **Drag & Drop Interface** - Simply drag images into the application
-- **Batch Processing** - Process hundreds of images at once
-- **Real-time Preview** - See enhanced results instantly
-- **Multiple Format Support** - GPR, JPEG, PNG, TIFF input formats
-- **Progress Tracking** - Visual progress bars for batch operations
-- **Dark/Light Themes** - Comfortable viewing in any environment
-- **No Installation Required** - Standalone executable, just download and run
-
-### Running from Source
-```bash
-# Install dependencies (first time only)
-pip install -r requirements.txt
-
-# Run the GUI application
-python gui/app.py
-```
-
-### Building the Executable
-```bash
-# Build standalone executable for your platform (from project root)
-pyinstaller gui/pyinstaller.spec
-
-# Find the executable in:
-# Windows: dist/UnderwaterEnhancer.exe
-# macOS:   dist/UnderwaterEnhancer.app
-# Linux:   dist/UnderwaterEnhancer
-```
-
-For detailed GUI documentation, see [gui/docs/GUI_README.md](gui/docs/GUI_README.md).
-
-## 🚀 Quick Start (Command Line)
-
-### Prerequisites
-- Python 3.8+
-- CUDA-compatible GPU (recommended)
-- GoPro GPR tools (automatically installed in dev container)
-
-### Installation
-```bash
-# Clone the repository
-git clone <repository-url>
-cd auto-image-encoder
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Verify GPR tools installation
-python -c "from preprocess_images import GPRPreprocessor; print('✓ Setup complete')"
-```
-
-### Download Pre-prepared Dataset from Hugging Face
-
-If you're working on a remote VM or want to use a pre-prepared dataset, you can download it directly from Hugging Face:
-
-```bash
-# Install huggingface_hub (included in requirements.txt)
-pip install huggingface_hub
-
-# Download the dataset (downloads to ./dataset by default)
-python dataset_prep/download_dataset.py
-
-# Download to a custom directory
-python dataset_prep/download_dataset.py --output my_dataset
-
-# Download a different dataset
-python dataset_prep/download_dataset.py --repo-id username/dataset-name
-```
-
-The script downloads the dataset with the correct structure:
-```
-dataset/
-├── input/   # Raw/input images
-└── target/  # Enhanced/target images
-```
-
-**For private datasets**, authenticate first:
-```bash
-huggingface-cli login
-python dataset_prep/download_dataset.py --repo-id username/private-dataset
-```
-
-After downloading, you can skip directly to training (step 3 below).
-
-### Usage Pipeline
-
-#### 1. Preprocess GPR Files
-```bash
-# Convert and crop GPR files to training format
-python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir processed
-
-# This creates:
-# processed/raw/      - DNG files from GPR conversion
-# processed/cropped/  - Center-cropped 4606×4030 TIFF images
-```
-
-#### 2. Prepare Training Dataset
-
-**Option A: From preprocessed GPR files**
-```bash
-# Organize paired raw/enhanced images for training
-python dataset_prep/prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
-
-# Creates organized dataset structure:
-# dataset/input/   - Raw images (renamed consistently)
-# dataset/target/  - Enhanced images (matching names)
-# dataset/split.txt - Train/validation split
-```
-
-**Option B: From Hugging Face dataset (paired .tif and .jpg in same directory)**
-```bash
-# Step 1: Crop images to standard dimensions (4606×4030)
-# This ensures all images are the correct size for training
-python dataset_prep/crop_tiff.py my_dataset/ --output-dir my_dataset_cropped --preserve-format
-
-# Step 2: Organize into training structure
-# If you have a dataset where input (.tif) and output (.jpg) files
-# are in the same directory with matching filenames
-python dataset_prep/prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf
-
-# Use --symlink to save disk space (creates symbolic links instead of copying)
-python dataset_prep/prepare_huggingface_dataset.py my_dataset_cropped/ --output dataset_hf --symlink
-
-# Creates the same organized structure:
-# dataset_hf/input/   - Raw images (.tif files)
-# dataset_hf/target/  - Enhanced images (.jpg files)
-# dataset_hf/split.txt - Train/validation split
-```
-
-#### 3. Train the Model
-
-```bash
-# Train with standard U-Net (auto-detects GPU/CPU)
-# Must specify --input-dir and --target-dir
-python training/train.py --input-dir dataset/input --target-dir dataset/target
-
-# With custom settings
-python training/train.py \
-  --input-dir dataset/input \
-  --target-dir dataset/target \
-  --image-size 512 \
-  --batch-size 8 \
-  --epochs 50
-
-# Resume from checkpoint
-python training/train.py \
-  --input-dir dataset/input \
-  --target-dir dataset/target \
-  --resume checkpoints/latest_checkpoint.pth
-
-# Monitor progress
-tensorboard --logdir logs
-```
-
-For detailed training options and Google Colab setup, see [TRAINING.md](TRAINING.md).
-
-#### 4. Run Inference
-```bash
-# Process single image
-python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth
-
-# Process entire directory
-python inference/inference.py /path/to/images --checkpoint checkpoints/best_model.pth --output enhanced_images
-
-# Create side-by-side comparisons
-python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
-
-# Process at full resolution (uses tiled processing for large images)
-python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-size
-```
-
-**Note**: For large images (>2048px), the inference script automatically uses tiled processing to avoid memory issues. This processes the image in overlapping tiles and blends them seamlessly.
-
-#### 5. Post-Process with Denoising (Optional)
-```bash
-# Apply denoising to TIFF outputs from inference
-python inference/denoise_tiff.py enhanced_images/ --output final_images/
-
-# Use specific denoising algorithm (options: bilateral, nlmeans, gaussian, median, tv_chambolle, wavelet, bm3d_approximation)
-python inference/denoise_tiff.py enhanced_images/ --method bilateral --output final_images/
-
-# Process single TIFF file with Non-Local Means (default)
-python inference/denoise_tiff.py input.tiff --output output.tiff --nlmeans-h 0.1
-
-# Use bilateral filter (recommended for underwater images)
-python inference/denoise_tiff.py input.tiff --method bilateral --bilateral-sigma-color 75
-
-# Preserve original value range
-python inference/denoise_tiff.py input.tiff --preserve-range
-```
-
-
-## 🏗️ Architecture
-
-### U-Net Model
-- Standard U-Net with skip connections (~31M parameters)
-- Feature progression: 64 → 128 → 256 → 512 → 1024 channels
-- Combined L1+MSE loss (80%/20%) for detail preservation and color consistency
-- Tiled processing for high-resolution images (>2048px)
-- Optional post-processing denoising with multiple algorithms
-
-For detailed architecture information, see [CLAUDE.md](CLAUDE.md).
-
-## 📊 Training
-
-The model uses a standard U-Net architecture trained on paired raw/enhanced underwater images.
+👉 **[See Training Documentation](training/README.md)**
 
 **Quick start:**
 ```bash
-python training/train.py
+# Install dependencies
+pip install -r requirements.txt
+
+# Train a model (downloads dataset automatically)
+python training/setup_and_train.py
+
+# Run inference on images
+python inference/inference.py input.jpg --checkpoint output/best_model.pth
 ```
 
-**Key features:**
-- Auto-detects GPU/CPU
-- Early stopping and learning rate scheduling
-- Validation comparisons every 5 epochs
-- Google Colab notebook available for free GPU training
+## 📂 Repository Structure
 
-For complete training documentation, command-line options, and hardware requirements, see [TRAINING.md](TRAINING.md).
+```
+├── gui/                    # Desktop GUI application
+│   ├── README.md          # GUI documentation
+│   └── app.py             # Application entry point
+│
+├── training/              # Model training
+│   ├── README.md          # Training documentation
+│   ├── train.py           # Training script
+│   └── setup_and_train.py # All-in-one training
+│
+├── inference/             # Run trained models
+│   └── inference.py       # Inference script
+│
+├── dataset_prep/          # Dataset preparation tools
+│   ├── download_dataset.py           # Download from Hugging Face
+│   ├── prepare_dataset.py            # Prepare local datasets
+│   └── prepare_huggingface_dataset.py # Prepare HF datasets
+│
+├── preprocessing/         # GPR file preprocessing
+│   └── preprocess_images.py # Convert GPR → TIFF
+│
+└── src/                   # Core library code
+    ├── models/            # Neural network architectures
+    ├── data/              # Dataset classes
+    └── gui/               # GUI components
+```
 
-See [TRAINING.md](TRAINING.md) for complete configuration options and troubleshooting.
+## 🛠️ Common Workflows
 
-## 📚 References
+### Process Images with GUI
+```bash
+python gui/app.py
+```
+See [gui/README.md](gui/README.md) for details.
 
-- [GoPro GPR Tools](https://github.com/keenanjohnson/gpr_tools) (fork with MSVC fixes)
+### Train a Model
+```bash
+# Quick: All-in-one script
+python training/setup_and_train.py
+
+# Manual: Step-by-step
+python dataset_prep/download_dataset.py
+python training/train.py --input-dir dataset/input --target-dir dataset/target
+```
+See [training/README.md](training/README.md) for details.
+
+### Run Inference (Command Line)
+```bash
+# Single image
+python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth
+
+# Batch process directory
+python inference/inference.py /path/to/images --checkpoint checkpoints/best_model.pth --output enhanced/
+
+# With comparison view
+python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
+```
+
+### Preprocess GPR Files
+```bash
+# Convert GPR to TIFF
+python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir processed
+```
+
+## 🏗️ Technical Details
+
+### Model Architecture
+- **U-Net** with skip connections (~31M parameters)
+- Feature progression: 64 → 128 → 256 → 512 → 1024 channels
+- Combined L1+MSE loss (80%/20%) for detail preservation
+- Supports full-resolution inference via tiled processing
+
+### Training Details
+- Framework: PyTorch
+- GPU: Auto-detects CUDA/MPS/CPU
+- Dataset: Paired raw/enhanced underwater images
+- Augmentation: Random crops, flips, rotations
+- Early stopping with validation monitoring
+
+See [CLAUDE.md](CLAUDE.md) for architecture details and development guidelines.
+
+## 📚 Documentation
+
+### User Documentation
+- **[gui/README.md](gui/README.md)** - GUI application guide
+- **[gui/docs/GUI_README.md](gui/docs/GUI_README.md)** - Detailed GUI user guide
+- **[gui/docs/MACOS_APP_INSTALLATION.md](gui/docs/MACOS_APP_INSTALLATION.md)** - macOS installation
+
+### Developer Documentation
+- **[training/README.md](training/README.md)** - Training quick start
+- **[TRAINING.md](TRAINING.md)** - Complete training guide
+- **[SETUP_CONFIG.md](SETUP_CONFIG.md)** - Configuration reference
+- **[CLAUDE.md](CLAUDE.md)** - Development guidelines
+- **[BUILD_README.md](BUILD_README.md)** - Build instructions
+- **[CLEANUP_GUIDE.md](CLEANUP_GUIDE.md)** - Cleanup utilities
+
+## 📦 Pre-trained Models
+
+Example trained models available at:
+https://drive.google.com/drive/u/0/folders/1Vdctr52LTxoS6eecFiGS5LROZYSqJ3vl
+
+Models are in `.pth` format and can be loaded in the GUI or command-line inference.
+
+## 💻 System Requirements
+
+### For GUI Application
+- **Minimum**: 8GB RAM, 4GB free disk space
+- **Recommended**: 16GB RAM, GPU for faster processing
+
+### For Training
+- **Minimum**: 8GB VRAM GPU, 16GB RAM, 20GB free disk
+- **Recommended**: 24GB VRAM GPU, 32GB RAM, 50GB free disk
+- **Free Alternative**: Google Colab (see `train_underwater_enhancer_colab.ipynb`)
+
+## 🔗 External Dependencies
+
+- **[GPR Tools](https://github.com/keenanjohnson/gpr_tools)** - For GPR file conversion
+  - Automatically compiled on macOS/Linux via `./build_scripts/compile_gpr_tools.sh`
+  - Pre-built binaries included for common platforms
+- **PyTorch** - Deep learning framework
+- **CustomTkinter** - GUI framework
+
+## 📖 References
+
 - [U-Net Paper](https://arxiv.org/abs/1505.04597)
-- [Underwater Enhancement Research](https://github.com/Seattle-Aquarium/CCR_development/issues/29)
+- [Project Discussion](https://github.com/Seattle-Aquarium/CCR_development/issues/29)
+- [Sample Data](https://github.com/Seattle-Aquarium/CCR_development/tree/rmt_edits/files/ML_image_processing)
 
 ## 🤝 Contributing
 
 This project is part of the Seattle Aquarium's ROV survey enhancement pipeline. For questions or contributions, refer to the main [CCR development repository](https://github.com/Seattle-Aquarium/CCR_development).
 
+## 📄 License
+
+[Add license information]
+
+---
+
+**Quick Links:**
+- 🖥️ **GUI Users**: Start with [gui/README.md](gui/README.md)
+- 🎓 **Training Models**: Start with [training/README.md](training/README.md)
+- 💻 **Developers**: See [CLAUDE.md](CLAUDE.md)
