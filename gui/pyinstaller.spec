@@ -127,7 +127,30 @@ a = Analysis(
     hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
     runtime_hooks=[os.path.join(spec_dir, 'gui', 'runtime_hook.py')],
-    excludes=[],
+    excludes=[
+        # Exclude unused libraries to reduce size (keeps CUDA support)
+        'matplotlib',
+        'scipy',
+        'pandas',
+        'IPython',
+        'jupyter',
+        'notebook',
+        'pytest',
+        'setuptools',
+        'wheel',
+        'pip',
+        # Exclude test modules
+        'torch.testing',
+        'torch.utils.tensorboard',
+        'torch.utils.benchmark',
+        # Exclude unused torchvision modules
+        'torchvision.datasets',
+        'torchvision.models.detection',
+        'torchvision.models.segmentation',
+        'torchvision.models.video',
+        # Exclude unused image processing
+        'skimage.data',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
