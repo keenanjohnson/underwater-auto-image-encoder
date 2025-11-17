@@ -1,8 +1,9 @@
 # Underwater Image Enhancement with ML
 
-Automated machine learning pipeline that replaces manual image editing for underwater GoPro images captured during ROV surveys. Converts RAW GPR files to enhanced images matching manual Adobe Lightroom editing quality.
+This is an automated machine learning pipeline that replaces manual image editing for underwater GoPro images captured during ROV surveys. 
+Converts RAW GPR files to enhanced images matching manual Adobe Lightroom editing quality.
 
-### For End Users: GUI Application
+### For People That Just Want to Process Images (GUI Application)
 
 **No programming required** - Desktop application available for Windows, macOS, and Linux.
 
@@ -11,92 +12,81 @@ Automated machine learning pipeline that replaces manual image editing for under
 **Quick steps:**
 1. Download the application for your platform
 2. Download a trained model (.pth file)
-3. Drag & drop images to enhance
+3. Select a Folder of Images to Enhance and hit go!
 
-### For Developers: Training & Command Line
+### For People Wanting to Train Their Own Models or Use Command Line Inference
 
 Train custom models or integrate into automated workflows.
 
 👉 **[See Training Documentation](training/README.md)**
 
+There are many options for customizing model architecture, training parameters, and datasets.
+
+These are defined in the setup_and_train_config.yaml file.
+
+The most important parameters are:
+
+repo_id - Which hugging face dataset to download and train with
+image_size - What size of images to train on. Ideally this should be as large as your GPU memory allows.
+batch_size - How many images to process at once. Again, larger is better, but limited by GPU memory.
+num_epochs - How many passes through the dataset to train for.
+
 **Quick start:**
 ```bash
-# Install dependencies
+python3.10 -m venv env
+source env/bin/activate  # On Windows use `env\Scripts\activate`
 pip install -r requirements.txt
 
-# Train a model (downloads dataset automatically)
+# Train a model (downloads dataset automatically and trains
 python training/setup_and_train.py
 
 # Run inference on images
 python inference/inference.py input.jpg --checkpoint output/best_model.pth
 ```
 
-## Common Workflows
+### Run Inference (Command Line Image Processing)
 
-### Process Images with GUI
+See the scripts in the `inference/` folder for more details on args
+
 ```bash
-python gui/app.py
-```
-See [gui/README.md](gui/README.md) for details.
+python3.10 -m venv env
+source env/bin/activate  # On Windows use `env\Scripts\activate`
+pip install -r requirements.txt
 
-### Train a Model
-```bash
-# Quick: All-in-one script
-python training/setup_and_train.py
-
-# Manual: Step-by-step
-python dataset_prep/download_dataset.py
-python training/train.py --input-dir dataset/input --target-dir dataset/target
-```
-See [training/README.md](training/README.md) for details.
-
-### Run Inference (Command Line)
-```bash
-# Single image
 python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth
-
-# Batch process directory
 python inference/inference.py /path/to/images --checkpoint checkpoints/best_model.pth --output enhanced/
-
-# With comparison view
 python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --compare
 ```
 
 ### Preprocess GPR Files
 ```bash
-# Convert GPR to TIFF
+python3.10 -m venv env
+source env/bin/activate  # On Windows use `env\Scripts\activate`
+pip install -r requirements.txt
+
 python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir processed
 ```
-
-## Documentation
-
-### User Documentation
-- **[gui/README.md](gui/README.md)** - GUI application guide
-- **[gui/docs/GUI_README.md](gui/docs/GUI_README.md)** - Detailed GUI user guide
-- **[gui/docs/MACOS_APP_INSTALLATION.md](gui/docs/MACOS_APP_INSTALLATION.md)** - macOS installation
-
-### Developer Documentation
-- **[training/README.md](training/README.md)** - Training quick start
-- **[TRAINING.md](TRAINING.md)** - Complete training guide
-- **[SETUP_CONFIG.md](SETUP_CONFIG.md)** - Configuration reference
-- **[CLAUDE.md](CLAUDE.md)** - Development guidelines
-- **[BUILD_README.md](BUILD_README.md)** - Build instructions
-- **[CLEANUP_GUIDE.md](CLEANUP_GUIDE.md)** - Cleanup utilities
 
 ## Pre-trained Models
 
 Example trained models are available for download here:
 https://huggingface.co/Seattle-Aquarium
 
+## Datasets
+
+The Seattle Aquarium CCR Underwater Image Enhancement Dataset is available at:
+https://huggingface.co/datasets/Seattle-Aquarium/Seattle_Aquarium_benthic_imagery
+
 ## References
 
+- [Project Discussion & Sample Data](https://github.com/Seattle-Aquarium/CCR_image_processing)
 - [U-Net Paper](https://arxiv.org/abs/1505.04597)
-- [Project Discussion](https://github.com/Seattle-Aquarium/CCR_development/issues/29)
-- [Sample Data](https://github.com/Seattle-Aquarium/CCR_development/tree/rmt_edits/files/ML_image_processing)
 
 ## Contributing
 
 This project is developed to support the Seattle Aquarium's ROV survey enhancement pipeline. For questions or contributions, refer to the main [CCR development repository](https://github.com/Seattle-Aquarium/CCR_development).
+
+You can also submit PRs or issues here and we will route them accordingly.
 
 ---
 
