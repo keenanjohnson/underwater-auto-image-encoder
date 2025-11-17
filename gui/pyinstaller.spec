@@ -139,10 +139,10 @@ a = Analysis(
         'setuptools',
         'wheel',
         'pip',
-        # Exclude test modules
-        'torch.testing',
-        'torch.utils.tensorboard',
-        'torch.utils.benchmark',
+        # Exclude PyTorch modules that cause issues or aren't needed
+        'torch.utils.tensorboard',      # TensorBoard logging (not needed)
+        'torch.distributed.rpc',         # Causes duplicate type errors
+        'torch.distributed.pipeline',    # Not needed for inference
         # Exclude unused torchvision modules
         'torchvision.datasets',
         'torchvision.models.detection',
