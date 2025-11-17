@@ -176,10 +176,6 @@ Models are in `.pth` format and can be loaded in the GUI or command-line inferen
 
 This project is part of the Seattle Aquarium's ROV survey enhancement pipeline. For questions or contributions, refer to the main [CCR development repository](https://github.com/Seattle-Aquarium/CCR_development).
 
-## 📄 License
-
-[Add license information]
-
 ---
 
 **Quick Links:**
