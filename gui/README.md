@@ -4,7 +4,7 @@ Desktop application for enhancing underwater images with machine learning. No pr
 
 ![Underwater Image Enhancer GUI](gui_screenshot.png)
 
-## 🚀 For Users: Download & Run
+## For Users: Download & Run
 
 ### Download Pre-built Application
 
@@ -47,7 +47,7 @@ chmod +x UnderwaterEnhancer
 ./UnderwaterEnhancer
 ```
 
-## ✨ Features
+## Features
 
 - **Drag & Drop Interface** - Simply drag images into the application
 - **Batch Processing** - Process hundreds of images at once
@@ -57,13 +57,13 @@ chmod +x UnderwaterEnhancer
 - **Dark/Light Themes** - Comfortable viewing in any environment
 - **No Installation Required** - Standalone executable, just download and run
 
-## 📖 User Guide
+## User Guide
 
 For complete usage instructions, see: [GUI User Guide](docs/GUI_README.md)
 
 ---
 
-## 🔧 For Developers
+## For Developers
 
 ### Running from Source
 

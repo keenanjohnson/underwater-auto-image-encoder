@@ -2,7 +2,7 @@
 
 Train a U-Net model to enhance underwater images using PyTorch.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### All-in-One Training Script (Recommended)
 
@@ -39,7 +39,7 @@ python training/setup_and_train.py
 
 See [SETUP_CONFIG.md](../SETUP_CONFIG.md) for all configuration options.
 
-## 📋 Manual Training Workflow
+## Manual Training Workflow
 
 ### Step 1: Prepare Dataset
 
@@ -97,7 +97,7 @@ tensorboard --logdir logs
 # Open browser to http://localhost:6006
 ```
 
-## 🎯 Training Options
+## Training Options
 
 ### Key Parameters
 
@@ -120,7 +120,7 @@ tensorboard --logdir logs
 - `logs/` - TensorBoard training logs
 - `validation_comparisons/` - Visual comparisons during training
 
-## 📊 Hardware Requirements
+## Hardware Requirements
 
 ### Minimum
 - **GPU**: 8GB VRAM (e.g., RTX 3060)
@@ -139,7 +139,7 @@ tensorboard --logdir logs
   - See [train_underwater_enhancer_colab.ipynb](../train_underwater_enhancer_colab.ipynb)
   - T4 GPU (16GB) included in free tier
 
-## 🧹 Cleanup
+## Cleanup
 
 ```bash
 # Preview what will be removed
@@ -157,13 +157,13 @@ python training/cleanup_training.py --keep-checkpoints --keep-outputs
 
 See [CLEANUP_GUIDE.md](../CLEANUP_GUIDE.md) for details.
 
-## 📚 Detailed Documentation
+## Detailed Documentation
 
 - **[TRAINING.md](../TRAINING.md)** - Complete training guide with all command-line options
 - **[SETUP_CONFIG.md](../SETUP_CONFIG.md)** - Configuration file reference
 - **[CLAUDE.md](../CLAUDE.md)** - Developer guidance and architecture details
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Out of Memory Error
 ```bash
@@ -185,7 +185,7 @@ ls dataset/target
 - CPU training is ~10-20x slower
 - Consider using Google Colab for free GPU access
 
-## 📈 After Training
+## After Training
 
 Once training completes, you'll have:
 
@@ -204,7 +204,7 @@ python gui/app.py
 # Then select your .pth file in the GUI
 ```
 
-## 🤝 Support
+## Support
 
 For questions or issues:
 - Check [TRAINING.md](../TRAINING.md) for detailed documentation

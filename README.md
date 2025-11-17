@@ -4,14 +4,14 @@ Automated machine learning pipeline that replaces manual image editing for under
 
 ![Underwater Image Enhancer GUI](gui_screenshot.png)
 
-## 🎯 Project Overview
+## Project Overview
 
 **Purpose**: Automate time-intensive manual photo editing for Seattle Aquarium ROV surveys
 **Input**: GoPro RAW (GPR) files or JPEG/TIFF images
 **Output**: Enhanced underwater images with improved color and clarity
 **Method**: U-Net neural network trained on manually-edited image pairs
 
-## 🚀 Quick Start
+## Quick Start
 
 ### For End Users: GUI Application
 
@@ -42,7 +42,7 @@ python training/setup_and_train.py
 python inference/inference.py input.jpg --checkpoint output/best_model.pth
 ```
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 ├── gui/                    # Desktop GUI application
@@ -71,7 +71,7 @@ python inference/inference.py input.jpg --checkpoint output/best_model.pth
     └── gui/               # GUI components
 ```
 
-## 🛠️ Common Workflows
+## Common Workflows
 
 ### Process Images with GUI
 ```bash
@@ -108,7 +108,7 @@ python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth 
 python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir processed
 ```
 
-## 🏗️ Technical Details
+## Technical Details
 
 ### Model Architecture
 - **U-Net** with skip connections (~31M parameters)
@@ -125,7 +125,7 @@ python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir proces
 
 See [CLAUDE.md](CLAUDE.md) for architecture details and development guidelines.
 
-## 📚 Documentation
+## Documentation
 
 ### User Documentation
 - **[gui/README.md](gui/README.md)** - GUI application guide
@@ -140,14 +140,14 @@ See [CLAUDE.md](CLAUDE.md) for architecture details and development guidelines.
 - **[BUILD_README.md](BUILD_README.md)** - Build instructions
 - **[CLEANUP_GUIDE.md](CLEANUP_GUIDE.md)** - Cleanup utilities
 
-## 📦 Pre-trained Models
+## Pre-trained Models
 
 Example trained models available at:
 https://drive.google.com/drive/u/0/folders/1Vdctr52LTxoS6eecFiGS5LROZYSqJ3vl
 
 Models are in `.pth` format and can be loaded in the GUI or command-line inference.
 
-## 💻 System Requirements
+## System Requirements
 
 ### For GUI Application
 - **Minimum**: 8GB RAM, 4GB free disk space
@@ -158,7 +158,7 @@ Models are in `.pth` format and can be loaded in the GUI or command-line inferen
 - **Recommended**: 24GB VRAM GPU, 32GB RAM, 50GB free disk
 - **Free Alternative**: Google Colab (see `train_underwater_enhancer_colab.ipynb`)
 
-## 🔗 External Dependencies
+## External Dependencies
 
 - **[GPR Tools](https://github.com/keenanjohnson/gpr_tools)** - For GPR file conversion
   - Automatically compiled on macOS/Linux via `./build_scripts/compile_gpr_tools.sh`
@@ -166,19 +166,19 @@ Models are in `.pth` format and can be loaded in the GUI or command-line inferen
 - **PyTorch** - Deep learning framework
 - **CustomTkinter** - GUI framework
 
-## 📖 References
+## References
 
 - [U-Net Paper](https://arxiv.org/abs/1505.04597)
 - [Project Discussion](https://github.com/Seattle-Aquarium/CCR_development/issues/29)
 - [Sample Data](https://github.com/Seattle-Aquarium/CCR_development/tree/rmt_edits/files/ML_image_processing)
 
-## 🤝 Contributing
+## Contributing
 
 This project is part of the Seattle Aquarium's ROV survey enhancement pipeline. For questions or contributions, refer to the main [CCR development repository](https://github.com/Seattle-Aquarium/CCR_development).
 
 ---
 
 **Quick Links:**
-- 🖥️ **GUI Users**: Start with [gui/README.md](gui/README.md)
-- 🎓 **Training Models**: Start with [training/README.md](training/README.md)
-- 💻 **Developers**: See [CLAUDE.md](CLAUDE.md)
+- **GUI Users**: Start with [gui/README.md](gui/README.md)
+- **Training Models**: Start with [training/README.md](training/README.md)
+- **Developers**: See [CLAUDE.md](CLAUDE.md)
