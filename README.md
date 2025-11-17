@@ -257,46 +257,7 @@ python training/train.py
 
 For complete training documentation, command-line options, and hardware requirements, see [TRAINING.md](TRAINING.md).
 
-## 📁 Project Structure
-
-```
-auto-image-encoder/
-├── dataset/                        # Training dataset (organized structure)
-│   ├── input/                      # Raw/input images
-│   ├── target/                     # Enhanced/target images
-│   └── split.txt                   # Train/validation split indices
-├── photos/                         # Full dataset (3414 image pairs)
-│   ├── input_GPR/                  # All GPR input images
-│   └── human_output_JPEG/          # All manually edited images
-├── train.py                        # Local training script (Standard U-Net)
-├── train_underwater_enhancer_colab.ipynb  # Google Colab notebook
-├── inference.py                    # Inference script with tiled processing
-├── preprocess_images.py            # GPR preprocessing script
-├── crop_tiff.py                    # Crop TIFF/JPEG/PNG images to standard dimensions
-├── prepare_dataset.py              # Dataset preparation (from separate dirs)
-├── prepare_huggingface_dataset.py  # Dataset preparation (from Hugging Face format)
-├── download_dataset.py             # Download datasets from Hugging Face
-├── denoise_tiff.py                 # Post-processing denoising script
-├── create_subset.py                # Dataset subset creation script
-├── config.yaml                     # Training configuration
-└── requirements.txt                # Python dependencies
-```
-
-## ⚙️ Configuration
-
-Edit `config.yaml` to customize training parameters (batch size, learning rate, loss weights, etc.).
-
-Key settings:
-- `batch_size`: 16 (reduce if out of memory)
-- `image_size`: [256, 256] (training patch size)
-- `learning_rate`: 0.0001
-- Loss weights: L1=0.8, MSE=0.2
-
 See [TRAINING.md](TRAINING.md) for complete configuration options and troubleshooting.
-
-## 🎯 Results
-
-The trained model reproduces manual Lightroom adjustments including denoising, white balance correction, tone adjustments, and contrast enhancement for underwater images.
 
 ## 📚 References
 
