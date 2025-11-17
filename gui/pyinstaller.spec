@@ -109,9 +109,7 @@ a = Analysis(
     [os.path.join(spec_dir, 'gui', 'app.py')],
     pathex=[spec_dir],  # Add absolute path to project root
     binaries=binaries,
-    datas=[
-        (os.path.join(spec_dir, 'config.yaml'), '.') if Path(os.path.join(spec_dir, 'config.yaml')).exists() else (os.path.join(spec_dir, 'config.yaml'), '.'),
-    ] + src_files,  # Include all Python files from src
+    datas=src_files,  # Include all Python files from src
     hiddenimports=[
         'customtkinter',
         'torch',
