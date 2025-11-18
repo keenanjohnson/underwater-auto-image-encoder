@@ -123,6 +123,8 @@ a = Analysis(
         'skimage',
         'tkinter',
         'darkdetect',
+        'distutils',  # Required by CustomTkinter on Linux
+        'distutils.version',
     ] + src_hiddenimports,  # Add all src submodules
     hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
