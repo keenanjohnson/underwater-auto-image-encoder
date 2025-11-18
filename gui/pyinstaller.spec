@@ -123,11 +123,32 @@ a = Analysis(
         'skimage',
         'tkinter',
         'darkdetect',
+        'distutils',  # Required by CustomTkinter
+        'distutils.version',
+        'setuptools._distutils',  # Compatibility layer for distutils
+        'setuptools._distutils.version',
     ] + src_hiddenimports,  # Add all src submodules
     hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
     runtime_hooks=[os.path.join(spec_dir, 'gui', 'runtime_hook.py')],
-    excludes=[],
+    excludes=[
+        # Exclude unused libraries to reduce size (keeps CUDA support)
+        'matplotlib',
+        'scipy',
+        'pandas',
+        'IPython',
+        'jupyter',
+        'notebook',
+        'pytest',
+        # NOTE: Cannot exclude setuptools - provides distutils compatibility layer
+        # Even on Python 3.10, PyInstaller may need setuptools._distutils
+        'wheel',
+        'pip',
+        # Don't exclude ANY PyTorch or torchvision modules - they're too interdependent
+        # Excluding torchvision modules causes operator registration errors
+        # Exclude unused image processing
+        'skimage.data',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
