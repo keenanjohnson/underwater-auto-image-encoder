@@ -409,10 +409,11 @@ jobs:
 
     - name: Create release archive
       run: |
-        # All builds are universal (GPU/CPU support)
+        # All builds are universal (GPU/CPU support) and use onedir mode
         if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
           cd dist
-          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}-universal.tar.gz" *
+          # Package the entire UnderwaterEnhancer directory
+          tar -czf "../UnderwaterEnhancer-${{ matrix.platform }}-universal.tar.gz" UnderwaterEnhancer
           cd ..
         elif [ "${{ matrix.os }}" == "macos-latest" ]; then
           cd dist
@@ -425,8 +426,10 @@ jobs:
           fi
           cd ..
         else
-          # Windows
-          cp "dist/UnderwaterEnhancer.exe" "UnderwaterEnhancer-${{ matrix.platform }}-universal.exe"
+          # Windows - package the entire UnderwaterEnhancer directory using Python
+          cd dist
+          python -c "import shutil; shutil.make_archive('../UnderwaterEnhancer-${{ matrix.platform }}-universal', 'zip', '.', 'UnderwaterEnhancer')"
+          cd ..
         fi
       shell: bash
 
