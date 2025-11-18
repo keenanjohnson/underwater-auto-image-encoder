@@ -139,12 +139,8 @@ a = Analysis(
         'setuptools',
         'wheel',
         'pip',
-        # Don't exclude ANY PyTorch modules - they're too interdependent
-        # Exclude unused torchvision modules
-        'torchvision.datasets',
-        'torchvision.models.detection',
-        'torchvision.models.segmentation',
-        'torchvision.models.video',
+        # Don't exclude ANY PyTorch or torchvision modules - they're too interdependent
+        # Excluding torchvision modules causes operator registration errors
         # Exclude unused image processing
         'skimage.data',
     ],
