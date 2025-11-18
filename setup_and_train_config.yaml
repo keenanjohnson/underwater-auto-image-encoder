@@ -25,10 +25,10 @@ cropping:
 
 # Training Configuration
 training:
-  image_size: 256  # Training image size (patches)
-  batch_size: 8  # Training batch size
+  image_size: 512  # Training image size (patches)
+  batch_size: 12  # Training batch size
   epochs: 150  # Number of training epochs
-  learning_rate: 0.0001  # Learning rate
+  learning_rate: 0.0002  # Learning rate
   output_dir: "output"  # Output directory for trained models
   checkpoint_dir: "checkpoints"  # Checkpoint directory
   resume: null  # Resume from checkpoint (null = start fresh)
