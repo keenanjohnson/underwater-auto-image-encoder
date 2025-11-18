@@ -123,8 +123,10 @@ a = Analysis(
         'skimage',
         'tkinter',
         'darkdetect',
-        'distutils',  # Required by CustomTkinter on Linux
+        'distutils',  # Required by CustomTkinter
         'distutils.version',
+        'setuptools._distutils',  # Compatibility layer for distutils
+        'setuptools._distutils.version',
     ] + src_hiddenimports,  # Add all src submodules
     hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
@@ -138,7 +140,8 @@ a = Analysis(
         'jupyter',
         'notebook',
         'pytest',
-        'setuptools',
+        # NOTE: Cannot exclude setuptools - provides distutils compatibility layer
+        # Even on Python 3.10, PyInstaller may need setuptools._distutils
         'wheel',
         'pip',
         # Don't exclude ANY PyTorch or torchvision modules - they're too interdependent
