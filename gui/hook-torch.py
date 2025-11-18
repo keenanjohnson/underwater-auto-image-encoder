@@ -1,6 +1,6 @@
 """
 PyInstaller hook for PyTorch - collects all necessary components
-KEEPS CUDA SUPPORT - minimal exclusions to ensure stability
+KEEPS CUDA SUPPORT - NO exclusions to ensure maximum compatibility
 """
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
 
@@ -8,8 +8,6 @@ from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
 datas = collect_data_files('torch', include_py_files=False)
 binaries = collect_dynamic_libs('torch')
 
-# Only exclude modules that are truly safe to exclude
-# Most PyTorch modules are interdependent, so we minimize exclusions
-excludedimports = [
-    'torch.utils.tensorboard',  # Safe to exclude - only for TensorBoard logging
-]
+# Don't exclude anything from PyTorch - it's too complex and interdependent
+# The size savings from exclusions aren't worth the compatibility issues
+excludedimports = []

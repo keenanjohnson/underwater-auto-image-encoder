@@ -139,9 +139,7 @@ a = Analysis(
         'setuptools',
         'wheel',
         'pip',
-        # Exclude only safe PyTorch modules
-        'torch.utils.tensorboard',      # TensorBoard logging (not needed)
-        # Note: Can't exclude torch.distributed.rpc - it's required by PyTorch internals
+        # Don't exclude ANY PyTorch modules - they're too interdependent
         # Exclude unused torchvision modules
         'torchvision.datasets',
         'torchvision.models.detection',
