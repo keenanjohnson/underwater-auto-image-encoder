@@ -22,15 +22,18 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            binary_name: UnderwaterEnhancer
+            binary_name: UnderwaterEnhancer/UnderwaterEnhancer
+            binary_dir: UnderwaterEnhancer
             gpr_binary: binaries/linux/gpr_tools
           - os: windows-latest
             platform: windows
-            binary_name: UnderwaterEnhancer.exe
+            binary_name: UnderwaterEnhancer/UnderwaterEnhancer.exe
+            binary_dir: UnderwaterEnhancer
             gpr_binary: binaries/win32/gpr_tools.exe
           - os: macos-latest
             platform: macos
             binary_name: UnderwaterEnhancer.app
+            binary_dir: UnderwaterEnhancer.app
             gpr_binary: binaries/darwin/gpr_tools
 
     runs-on: ${{ matrix.os }}
@@ -333,26 +336,27 @@ jobs:
         import os
         import platform
 
-        if platform.system() == 'Darwin':
-            # macOS app bundle
-            app_path = 'dist/UnderwaterEnhancer.app'
+        # All platforms now use onedir mode - calculate directory size
+        build_dir = 'dist/${{ matrix.binary_dir }}'
+
+        if os.path.exists(build_dir):
             total_size = sum(
                 os.path.getsize(os.path.join(dirpath, filename))
-                for dirpath, dirnames, filenames in os.walk(app_path)
+                for dirpath, dirnames, filenames in os.walk(build_dir)
                 for filename in filenames
             )
-        elif platform.system() == 'Windows':
-            total_size = os.path.getsize('dist/UnderwaterEnhancer.exe')
         else:
-            total_size = os.path.getsize('dist/UnderwaterEnhancer')
+            print(f'ERROR: Build directory not found: {build_dir}')
+            import sys
+            sys.exit(1)
 
         size_mb = total_size / (1024 * 1024)
         size_gb = total_size / (1024 * 1024 * 1024)
 
         if size_gb >= 1:
-            print(f'Executable size: {size_gb:.2f} GB ({total_size:,} bytes)')
+            print(f'Build directory size: {size_gb:.2f} GB ({total_size:,} bytes)')
         else:
-            print(f'Executable size: {size_mb:.2f} MB ({total_size:,} bytes)')
+            print(f'Build directory size: {size_mb:.2f} MB ({total_size:,} bytes)')
 
         # Warn if size seems wrong for universal build
         if platform.system() != 'Darwin' and size_mb < 1000:
@@ -386,7 +390,8 @@ jobs:
         echo "Testing binary startup and GPU detection..."
 
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          dist/UnderwaterEnhancer.exe --smoke-test
+          # Windows onedir build
+          dist/UnderwaterEnhancer/UnderwaterEnhancer.exe --smoke-test
         elif [ "${{ matrix.os }}" == "macos-latest" ]; then
           # Check app bundle structure first
           echo "Checking app bundle structure..."
@@ -398,7 +403,7 @@ jobs:
           echo "Testing binary execution..."
           dist/UnderwaterEnhancer.app/Contents/MacOS/UnderwaterEnhancer --smoke-test
         else
-          dist/UnderwaterEnhancer --smoke-test
+          dist/UnderwaterEnhancer/UnderwaterEnhancer --smoke-test
         fi
       shell: bash
 

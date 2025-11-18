@@ -187,21 +187,17 @@ if system == 'darwin':
         name='UnderwaterEnhancer',
     )
 else:
-    # Windows/Linux: Use onefile mode
+    # Windows/Linux: Use onedir mode
     exe = EXE(
         pyz,
         a.scripts,
-        a.binaries,
-        a.zipfiles,
-        a.datas,
         [],
+        exclude_binaries=True,
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
-        upx_exclude=[],
-        runtime_tmpdir=None,
         console=False,  # Set to True for debugging
         disable_windowed_traceback=False,
         argv_emulation=False,
@@ -209,6 +205,16 @@ else:
         codesign_identity=None,
         entitlements_file=None,
         icon=os.path.join(spec_dir, 'assets', 'icon.ico') if system == 'windows' and Path(os.path.join(spec_dir, 'assets', 'icon.ico')).exists() else None,
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name='UnderwaterEnhancer',
     )
 
 # macOS specific
