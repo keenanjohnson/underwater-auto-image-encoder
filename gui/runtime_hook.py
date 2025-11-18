@@ -6,6 +6,11 @@ import os
 from pathlib import Path
 import inspect
 
+# Disable PyTorch JIT before importing torch
+# This prevents torch._sources.parse_def from being called
+os.environ['PYTORCH_JIT'] = '0'
+os.environ['PYTORCH_JIT_USE_NNC_NOT_NVFUSER'] = '0'
+
 # Get the directory where the executable is located
 if hasattr(sys, '_MEIPASS'):
     # Running in PyInstaller bundle
