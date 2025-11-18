@@ -1,9 +1,10 @@
 """
-Runtime hook to ensure src modules can be imported
+Runtime hook to ensure src modules can be imported and PyTorch works with PyInstaller
 """
 import sys
 import os
 from pathlib import Path
+import inspect
 
 # Get the directory where the executable is located
 if hasattr(sys, '_MEIPASS'):
@@ -38,3 +39,39 @@ else:
 # Also add the base path
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
+
+# PyTorch compatibility fixes for PyInstaller
+# PyTorch's inspect.getsource() calls fail in frozen apps, so we patch them
+_original_getsource = inspect.getsource
+_original_getsourcelines = inspect.getsourcelines
+_original_findsource = inspect.findsource
+
+def _patched_getsource(object):
+    """Patched getsource that returns empty string instead of failing"""
+    try:
+        return _original_getsource(object)
+    except (OSError, TypeError):
+        # Return empty source code when running in PyInstaller
+        return ""
+
+def _patched_getsourcelines(object):
+    """Patched getsourcelines that returns empty list instead of failing"""
+    try:
+        return _original_getsourcelines(object)
+    except (OSError, TypeError):
+        # Return empty source lines when running in PyInstaller
+        return ([], 0)
+
+def _patched_findsource(object):
+    """Patched findsource that returns empty source instead of failing"""
+    try:
+        return _original_findsource(object)
+    except (OSError, TypeError):
+        # Return empty source when running in PyInstaller
+        return ([], 0)
+
+# Apply patches only when running in PyInstaller bundle
+if hasattr(sys, '_MEIPASS'):
+    inspect.getsource = _patched_getsource
+    inspect.getsourcelines = _patched_getsourcelines
+    inspect.findsource = _patched_findsource
