@@ -139,10 +139,9 @@ a = Analysis(
         'setuptools',
         'wheel',
         'pip',
-        # Exclude PyTorch modules that cause issues or aren't needed
+        # Exclude only safe PyTorch modules
         'torch.utils.tensorboard',      # TensorBoard logging (not needed)
-        'torch.distributed.rpc',         # Causes duplicate type errors
-        'torch.distributed.pipeline',    # Not needed for inference
+        # Note: Can't exclude torch.distributed.rpc - it's required by PyTorch internals
         # Exclude unused torchvision modules
         'torchvision.datasets',
         'torchvision.models.detection',
