@@ -211,7 +211,7 @@ class LearnedPositionalEncoding(nn.Module):
     """Learned positional encoding"""
     def __init__(self, max_position_embeddings, embedding_dim, seq_length):
         super(LearnedPositionalEncoding, self).__init__()
-        self.position_embeddings = nn.Parameter(torch.zeros(1, 256, 512))
+        self.position_embeddings = nn.Parameter(torch.zeros(1, seq_length, embedding_dim))
 
     def forward(self, x, position_ids=None):
         position_embeddings = self.position_embeddings
@@ -797,9 +797,13 @@ class UShapeTransformer(nn.Module):
         self.Conv5 = conv_block(512, 256)
 
         # Channel-wise Multi-Scale Feature Fusion Transformer (CMSFFT)
+        # Scale patch sizes based on image dimension (base is 256 with patches [32, 16, 8, 4])
+        scale = img_dim // 256
+        patch_sizes = [32 * scale, 16 * scale, 8 * scale, 4 * scale]
         self.mtc = ChannelTransformer(
+            img_size=img_dim,
             channel_num=[32, 64, 128, 256],
-            patchSize=[32, 16, 8, 4]
+            patchSize=patch_sizes
         )
 
         # Decoder
