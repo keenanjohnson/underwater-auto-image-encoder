@@ -159,51 +159,14 @@ class AttentionUNet(nn.Module):
         return self.output_activation(out)
 
 
-class WaterNet(nn.Module):
-    """Specialized network for underwater image enhancement with water-specific modules"""
-    
-    def __init__(self, n_channels=3, n_classes=3, base_features=32):
-        super(WaterNet, self).__init__()
-        
-        self.color_correction_module = nn.Sequential(
-            nn.Conv2d(n_channels, base_features, 1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(base_features, base_features, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(base_features, n_channels, 1),
-            nn.Tanh()
-        )
-        
-        self.main_network = AttentionUNet(n_channels * 2, n_classes, base_features)
-        
-        self.residual_weight = nn.Parameter(torch.tensor(0.1))
-    
-    def forward(self, x):
-        color_corrected = self.color_correction_module(x)
-        color_corrected = x + color_corrected * 0.5
-        
-        combined_input = torch.cat([x, color_corrected], dim=1)
-        
-        enhanced = self.main_network(combined_input)
-        
-        output = enhanced + x * self.residual_weight
-        
-        return torch.clamp(output, 0, 1)
-
-
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
-    
+
     model = AttentionUNet(n_channels=3, n_classes=3).to(device)
-    
+
     dummy_input = torch.randn(1, 3, 256, 256).to(device)
     output = model(dummy_input)
-    
+
     print(f"AttentionUNet output shape: {output.shape}")
     print(f"Number of parameters: {sum(p.numel() for p in model.parameters()):,}")
-    
-    water_model = WaterNet().to(device)
-    water_output = water_model(dummy_input)
-    print(f"\nWaterNet output shape: {water_output.shape}")
-    print(f"Number of parameters: {sum(p.numel() for p in water_model.parameters()):,}")
