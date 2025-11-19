@@ -245,6 +245,14 @@ Examples:
         help='Resume training from checkpoint'
     )
 
+    parser.add_argument(
+        '--model',
+        type=str,
+        default=None,
+        choices=['unet', 'ushape_transformer'],
+        help='Model architecture: unet or ushape_transformer'
+    )
+
     # Step control
     parser.add_argument(
         '--skip-download',
@@ -318,6 +326,7 @@ Examples:
     output_dir = args.output_dir or training_config.get('output_dir', 'output')
     checkpoint_dir = args.checkpoint_dir or training_config.get('checkpoint_dir', 'checkpoints')
     resume = args.resume or training_config.get('resume')
+    model = args.model or training_config.get('model', 'unet')
 
     # Step control
     steps_config = config.get('steps', {})
@@ -465,7 +474,8 @@ Examples:
         logger.info(f"    --target-dir {target_cropped_dir} \\")
         logger.info(f"    --image-size {image_size} \\")
         logger.info(f"    --batch-size {batch_size} \\")
-        logger.info(f"    --epochs {epochs}")
+        logger.info(f"    --epochs {epochs} \\")
+        logger.info(f"    --model {model}")
         logger.info("="*80)
         return 0
 
@@ -481,7 +491,8 @@ Examples:
         '--epochs', str(epochs),
         '--lr', str(lr),
         '--output-dir', output_dir,
-        '--checkpoint-dir', checkpoint_dir
+        '--checkpoint-dir', checkpoint_dir,
+        '--model', model
     ]
 
     if resume:
