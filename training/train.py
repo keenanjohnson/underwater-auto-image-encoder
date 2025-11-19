@@ -20,6 +20,10 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.models.ushape_transformer import UShapeTransformer
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -345,6 +349,10 @@ def main():
     parser.add_argument('--l1-weight', type=float, default=0.8, help='L1 loss weight (default: 0.8)')
     parser.add_argument('--mse-weight', type=float, default=0.2, help='MSE loss weight (default: 0.2)')
 
+    # Model selection
+    parser.add_argument('--model', type=str, default='unet', choices=['unet', 'ushape_transformer'],
+                       help='Model architecture (default: unet)')
+
     args = parser.parse_args()
 
     # Set random seeds
@@ -441,8 +449,24 @@ def main():
         logger.error("Batch size may be too large for available GPU memory")
         return
 
-    # Create model
-    model = UNetAutoencoder(n_channels=3, n_classes=3).to(device)
+    # Create model based on selection
+    if args.model == 'ushape_transformer':
+        # U-shape Transformer requires specific image size (must be divisible by 16)
+        model_img_size = image_size if image_size is not None else 256
+        if model_img_size % 16 != 0:
+            logger.warning(f"Image size {model_img_size} not divisible by 16, adjusting to {(model_img_size // 16) * 16}")
+            model_img_size = (model_img_size // 16) * 16
+
+        model = UShapeTransformer(
+            img_dim=model_img_size,
+            in_ch=3,
+            out_ch=3,
+            return_single=True  # Return single output for non-GAN training
+        ).to(device)
+        logger.info(f"Using U-shape Transformer model (img_dim={model_img_size})")
+    else:
+        model = UNetAutoencoder(n_channels=3, n_classes=3).to(device)
+        logger.info("Using U-Net Autoencoder model")
 
     total_params = sum(p.numel() for p in model.parameters())
     logger.info(f"Model parameters: {total_params:,}")
@@ -518,6 +542,7 @@ def main():
                 'resolution': resolution_str,
                 'batch_size': args.batch_size,
                 'image_size': image_size if image_size is not None else 4606,
+                'model': args.model,
             }
         }
 
@@ -535,6 +560,7 @@ def main():
                 'n_channels': 3,
                 'n_classes': 3,
                 'image_size': image_size if image_size is not None else 4606,
+                'model': args.model,
             }
 
             torch.save(checkpoint, best_model_path)
@@ -554,6 +580,7 @@ def main():
             'n_channels': 3,
             'n_classes': 3,
             'image_size': image_size if image_size is not None else 4606,
+            'model': args.model,
         },
         'training_history': {
             'train_losses': train_losses,
@@ -565,6 +592,7 @@ def main():
             'resolution': resolution_str,
             'batch_size': args.batch_size,
             'epochs': len(train_losses),
+            'model': args.model,
         }
     }
     torch.save(final_checkpoint, final_model_path)

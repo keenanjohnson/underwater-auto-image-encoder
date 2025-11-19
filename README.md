@@ -26,10 +26,13 @@ These are defined in the setup_and_train_config.yaml file.
 
 The most important parameters are:
 
-repo_id - Which hugging face dataset to download and train with
-image_size - What size of images to train on. Ideally this should be as large as your GPU memory allows.
-batch_size - How many images to process at once. Again, larger is better, but limited by GPU memory.
-num_epochs - How many passes through the dataset to train for.
+- **model** - Model architecture to use:
+  - `unet` - Standard U-Net autoencoder (~31M params) - faster training, good baseline
+  - `ushape_transformer` - U-shape Transformer with CMSFFT+SGFMT (~31M params) - better quality, slower training
+- **repo_id** - Which hugging face dataset to download and train with
+- **image_size** - What size of images to train on. Ideally this should be as large as your GPU memory allows.
+- **batch_size** - How many images to process at once. Again, larger is better, but limited by GPU memory.
+- **num_epochs** - How many passes through the dataset to train for.
 
 **Quick start:**
 ```bash
@@ -81,6 +84,7 @@ https://huggingface.co/datasets/Seattle-Aquarium/Seattle_Aquarium_benthic_imager
 
 - [Project Discussion & Sample Data](https://github.com/Seattle-Aquarium/CCR_image_processing)
 - [U-Net Paper](https://arxiv.org/abs/1505.04597)
+- [U-shape Transformer for Underwater Image Enhancement](https://github.com/LintaoPeng/U-shape_Transformer_for_Underwater_Image_Enhancement) - Lintao Peng et al.
 
 ## Contributing
 

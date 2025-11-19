@@ -19,7 +19,7 @@ from tqdm import tqdm
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.models.unet_autoencoder import UNetAutoencoder, LightweightUNet
-from src.models.attention_unet import AttentionUNet, WaterNet
+from src.models.attention_unet import AttentionUNet
 
 # Colab-compatible model blocks (matching exact architecture from notebook)
 class ColabDoubleConv(torch.nn.Module):
@@ -208,9 +208,6 @@ class Inferencer:
         elif model_type == 'AttentionUNet':
             model_params['base_features'] = self.config['model']['base_features']
             self.model = AttentionUNet(**model_params)
-        elif model_type == 'WaterNet':
-            model_params['base_features'] = self.config['model']['base_features']
-            self.model = WaterNet(**model_params)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
         
