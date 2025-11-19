@@ -794,7 +794,7 @@ class UShapeTransformer(nn.Module):
         self.Conv4 = conv_block(128, 128)
         self.Conv4_1 = conv_block(128, 256)
 
-        self.Conv5 = conv_block(512, 256)
+        self.Conv5 = conv_block(self.embedding_dim, 256)
 
         # Channel-wise Multi-Scale Feature Fusion Transformer (CMSFFT)
         # Scale patch sizes based on image dimension (base is 256 with patches [32, 16, 8, 4])
