@@ -43,14 +43,17 @@ jobs:
       with:
         python-version: '3.10'
 
+    - name: Get pip cache dir
+      id: pip-cache
+      shell: bash
+      run: |
+        echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+
     - name: Cache pip packages
       uses: actions/cache@v4
       with:
-        path: |
-          ~/.cache/pip
-          ~/Library/Caches/pip
-          ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-universal-${{ hashFiles('requirements_gui.txt') }}
+        path: ${{ steps.pip-cache.outputs.dir }}
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('**/requirements*.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-universal-
           ${{ runner.os }}-pip-
