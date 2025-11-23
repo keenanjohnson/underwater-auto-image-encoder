@@ -50,7 +50,7 @@ jobs:
           ~/.cache/pip
           ~/Library/Caches/pip
           ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-universal-${{ hashFiles('gui/requirements-gui.txt') }}
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('**/requirements-gui.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-universal-
           ${{ runner.os }}-pip-
