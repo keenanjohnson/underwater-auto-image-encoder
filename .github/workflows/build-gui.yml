@@ -50,7 +50,7 @@ jobs:
           ~/.cache/pip
           ~/Library/Caches/pip
           ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-universal-${{ hashFiles('**/requirements-gui.txt') }}
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('requirements_gui.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-universal-
           ${{ runner.os }}-pip-
@@ -152,8 +152,7 @@ jobs:
         fi
 
         # Install other dependencies
-        pip install -r gui/requirements-gui.txt
-        pip install pyinstaller>=6.0.0  # For packaging
+        pip install -r requirements_gui.txt
 
         # Verify PyTorch installation
         python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
