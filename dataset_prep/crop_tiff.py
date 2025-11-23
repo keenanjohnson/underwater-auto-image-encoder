@@ -36,9 +36,32 @@ def center_crop_image(
     try:
         img = Image.open(input_path)
 
+        # Extract metadata before any conversions
+        metadata = {}
+
+        # Preserve EXIF data
+        if 'exif' in img.info:
+            metadata['exif'] = img.info['exif']
+
+        # Preserve ICC color profile
+        if 'icc_profile' in img.info:
+            metadata['icc_profile'] = img.info['icc_profile']
+
+        # Preserve DPI information
+        if 'dpi' in img.info:
+            metadata['dpi'] = img.info['dpi']
+
+        # Preserve any other metadata that PIL supports
+        for key in ['transparency', 'gamma', 'chromaticity']:
+            if key in img.info:
+                metadata[key] = img.info[key]
+
         # Convert to RGB if needed
         if img.mode != 'RGB':
             img = img.convert('RGB')
+        
+        # Remove transparency metadata as it's not valid for RGB mode
+        metadata.pop('transparency', None)
 
         width, height = img.size
         crop_width, crop_height = crop_size
@@ -60,13 +83,18 @@ def center_crop_image(
         # Crop image
         cropped = img.crop((left, top, right, bottom))
 
-        # Save cropped image
+        # Save cropped image with preserved metadata
         if preserve_format:
-            # Keep original format
-            cropped.save(output_path)
+            # Keep original format with metadata
+            try:
+                cropped.save(output_path, **metadata)
+            except (TypeError, OSError) as e:
+                logger.warning(f"Failed to save with full metadata: {e}. Retrying with basic metadata.")
+                safe_metadata = {k: v for k, v in metadata.items() if k in ['exif', 'dpi']}
+                cropped.save(output_path, **safe_metadata)
         else:
-            # Save as TIFF
-            cropped.save(output_path, 'TIFF', compression='none')
+            # Save as TIFF with metadata
+            cropped.save(output_path, 'TIFF', compression='none', **metadata)
 
         return True
 
