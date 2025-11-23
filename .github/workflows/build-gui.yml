@@ -47,7 +47,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-universal-${{ hashFiles('requirements_gui.txt') }}
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('gui/requirements-gui.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-universal-
           ${{ runner.os }}-pip-
@@ -131,37 +131,6 @@ jobs:
         cmake --version || echo "cmake not found"
         python --version
         pip --version
-    
-    - name: Create requirements_gui.txt if not exists
-      run: |
-        python -c "
-        import os
-        if not os.path.exists('requirements_gui.txt'):
-            requirements = '''# GUI Framework
-        customtkinter>=5.2.0
-        darkdetect>=0.8.0
-        
-        # Image Processing
-        Pillow>=10.0.0
-        opencv-python>=4.8.0
-        scikit-image>=0.21.0
-        rawpy>=0.18.0
-        imageio>=2.31.0
-        
-        # ML Dependencies (torch installed separately)
-        torchvision>=0.15.0
-        numpy>=1.24.0
-        
-        # Utilities
-        PyYAML>=6.0
-        tqdm>=4.65.0
-        
-        # Packaging
-        pyinstaller>=6.0.0
-        '''
-            with open('requirements_gui.txt', 'w') as f:
-                f.write(requirements)
-        "
 
     - name: Install Python dependencies (Universal GPU/CPU Build)
       run: |
@@ -180,7 +149,8 @@ jobs:
         fi
 
         # Install other dependencies
-        pip install -r requirements_gui.txt
+        pip install -r gui/requirements-gui.txt
+        pip install pyinstaller>=6.0.0  # For packaging
 
         # Verify PyTorch installation
         python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
