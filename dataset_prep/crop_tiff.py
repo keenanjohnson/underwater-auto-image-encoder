@@ -59,6 +59,8 @@ def center_crop_image(
         # Convert to RGB if needed
         if img.mode != 'RGB':
             img = img.convert('RGB')
+            # Remove transparency metadata as it's not valid for RGB
+            metadata.pop('transparency', None)
 
         width, height = img.size
         crop_width, crop_height = crop_size
