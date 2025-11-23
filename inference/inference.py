@@ -20,6 +20,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from src.models.unet_autoencoder import UNetAutoencoder, LightweightUNet
 from src.models.attention_unet import AttentionUNet
+from src.models.ushape_transformer import UShapeTransformer
 
 # Colab-compatible model blocks (matching exact architecture from notebook)
 class ColabDoubleConv(torch.nn.Module):
@@ -117,9 +118,12 @@ class Inferencer:
     
     def __init__(self, checkpoint_path: str, config_path: str = None):
         """Initialize inferencer with trained model"""
-        
+
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
-        
+
+        # Detect model type from checkpoint
+        self.detected_model_type = self._detect_model_type(checkpoint)
+
         if config_path and os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 self.config = yaml.safe_load(f)
@@ -146,19 +150,35 @@ class Inferencer:
         logger.info(f"Validation loss: {checkpoint.get('val_loss', 'N/A')}")
         
         self.setup_transforms()
-    
+
+    def _detect_model_type(self, checkpoint):
+        """Detect model type from checkpoint state dict keys"""
+        state_dict = checkpoint.get('model_state_dict', {})
+
+        # Check for U-Shape Transformer specific keys
+        if any(key.startswith('mtc.') for key in state_dict.keys()):
+            logger.info("Detected U-Shape Transformer model from checkpoint")
+            return 'UShapeTransformer'
+
+        # Check for Attention U-Net specific keys
+        if any('attention' in key.lower() for key in state_dict.keys()):
+            logger.info("Detected Attention U-Net model from checkpoint")
+            return 'AttentionUNet'
+
+        # Default to standard U-Net
+        logger.info("Detected standard U-Net model from checkpoint")
+        return 'UNetAutoencoder'
+
     def _create_default_config(self, checkpoint):
         """Create default config for Colab-trained models"""
         # Check if checkpoint has model_config (from final save in Colab)
         if 'model_config' in checkpoint:
             model_config = checkpoint['model_config']
-            return {
+            config = {
                 'model': {
-                    'type': 'UNetAutoencoder',  # Default to UNetAutoencoder as used in Colab
+                    'type': self.detected_model_type,
                     'n_channels': model_config.get('n_channels', 3),
                     'n_classes': model_config.get('n_classes', 3),
-                    'base_features': 64,  # Default U-Net base features
-                    'bilinear': False
                 },
                 'data': {
                     'image_size': [model_config.get('image_size', 256), model_config.get('image_size', 256)]
@@ -167,15 +187,32 @@ class Inferencer:
                     'resize_inference': True  # Default: resize to training size for faster inference
                 }
             }
-        else:
-            # Fallback config for basic Colab checkpoints
-            return {
-                'model': {
-                    'type': 'UNetAutoencoder',
-                    'n_channels': 3,
-                    'n_classes': 3,
+
+            # Add model-specific parameters
+            if self.detected_model_type == 'UShapeTransformer':
+                config['model'].update({
+                    'img_dim': model_config.get('image_size', 256),
+                    'patch_dim': model_config.get('patch_dim', 16),
+                    'embedding_dim': model_config.get('embedding_dim', 512),
+                    'num_heads': model_config.get('num_heads', 8),
+                    'num_layers': model_config.get('num_layers', 4),
+                    'hidden_dim': model_config.get('hidden_dim', 256),
+                    'return_single': True  # Always return single output for inference
+                })
+            else:
+                config['model'].update({
                     'base_features': 64,
                     'bilinear': False
+                })
+
+            return config
+        else:
+            # Fallback config for basic Colab checkpoints
+            config = {
+                'model': {
+                    'type': self.detected_model_type,
+                    'n_channels': 3,
+                    'n_classes': 3,
                 },
                 'data': {
                     'image_size': [256, 256]
@@ -184,6 +221,25 @@ class Inferencer:
                     'resize_inference': True
                 }
             }
+
+            # Add model-specific parameters
+            if self.detected_model_type == 'UShapeTransformer':
+                config['model'].update({
+                    'img_dim': 256,
+                    'patch_dim': 16,
+                    'embedding_dim': 512,
+                    'num_heads': 8,
+                    'num_layers': 4,
+                    'hidden_dim': 256,
+                    'return_single': True
+                })
+            else:
+                config['model'].update({
+                    'base_features': 64,
+                    'bilinear': False
+                })
+
+            return config
     
     def setup_model(self):
         """Initialize model architecture"""
@@ -192,8 +248,23 @@ class Inferencer:
             'n_channels': self.config['model']['n_channels'],
             'n_classes': self.config['model']['n_classes']
         }
-        
-        if model_type == 'LightweightUNet':
+
+        if model_type == 'UShapeTransformer':
+            # U-Shape Transformer uses different parameter names
+            model_params = {
+                'img_dim': self.config['model'].get('img_dim', 256),
+                'patch_dim': self.config['model'].get('patch_dim', 16),
+                'embedding_dim': self.config['model'].get('embedding_dim', 512),
+                'num_channels': self.config['model']['n_channels'],
+                'num_heads': self.config['model'].get('num_heads', 8),
+                'num_layers': self.config['model'].get('num_layers', 4),
+                'hidden_dim': self.config['model'].get('hidden_dim', 256),
+                'in_ch': self.config['model']['n_channels'],
+                'out_ch': self.config['model']['n_classes'],
+                'return_single': self.config['model'].get('return_single', True)
+            }
+            self.model = UShapeTransformer(**model_params)
+        elif model_type == 'LightweightUNet':
             model_params['base_features'] = self.config['model']['base_features']
             self.model = LightweightUNet(**model_params)
         elif model_type == 'UNetAutoencoder':
@@ -210,7 +281,7 @@ class Inferencer:
             self.model = AttentionUNet(**model_params)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
-        
+
         self.model = self.model.to(self.device)
     
     def setup_transforms(self):
@@ -222,7 +293,7 @@ class Inferencer:
                 image_size = tuple(inference_config['inference_size'])
             else:
                 image_size = tuple(self.config['data']['image_size'])
-            
+
             self.transform = transforms.Compose([
                 transforms.Resize(image_size),
                 transforms.ToTensor()
@@ -250,18 +321,29 @@ class Inferencer:
         
         return tensor, (pad_h, pad_w)
 
-    def process_image_tiled(self, image_path: Path, tile_size=1024, overlap=128, progress_callback=None):
+    def process_image_tiled(self, image_path: Path, tile_size=None, overlap=128, progress_callback=None):
         """Process large image using tiling with seamless blending to avoid artifacts
 
         Args:
             image_path: Path to input image
-            tile_size: Size of each tile
+            tile_size: Size of each tile (default: 1024 for U-Net, img_dim for U-Shape Transformer)
             overlap: Overlap between tiles (used for blending)
             progress_callback: Optional callback(message) for progress updates
         """
         img = Image.open(image_path).convert('RGB')
         original_size = img.size
         width, height = original_size
+
+        # For U-Shape Transformer, use the model's img_dim as tile size
+        model_type = self.config['model']['type']
+        if tile_size is None:
+            if model_type == 'UShapeTransformer':
+                tile_size = self.config['model'].get('img_dim', 256)
+                # Use smaller overlap for smaller tiles
+                overlap = min(overlap, tile_size // 4)
+                logger.info(f"U-Shape Transformer: using tile_size={tile_size} (model img_dim)")
+            else:
+                tile_size = 1024
 
         logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles and {overlap}px overlap")
         if progress_callback:
@@ -290,21 +372,37 @@ class Inferencer:
 
                 # Extract tile
                 tile = img.crop((x, y, x_end, y_end))
+                tile_original_size = tile.size
 
-                # Process tile
-                input_tensor = self.transform(tile).unsqueeze(0).to(self.device)
-                padded_tensor, (pad_h, pad_w) = self.pad_to_multiple(input_tensor, multiple=32)
+                # For U-Shape Transformer, resize tile to exact model size if needed
+                if model_type == 'UShapeTransformer' and (tile_width != tile_size or tile_height != tile_size):
+                    # Resize to exact tile_size for model processing
+                    tile_resized = tile.resize((tile_size, tile_size), Image.LANCZOS)
+                    input_tensor = self.transform(tile_resized).unsqueeze(0).to(self.device)
 
-                with torch.no_grad():
-                    output_tensor = self.model(padded_tensor)
+                    with torch.no_grad():
+                        output_tensor = self.model(input_tensor)
 
-                # Remove padding
-                if pad_h > 0 or pad_w > 0:
-                    _, _, h, w = input_tensor.shape
-                    output_tensor = output_tensor[:, :, :h, :w]
+                    output_tensor = output_tensor.squeeze(0).cpu()
+                    enhanced_tile_resized = self.inverse_transform(output_tensor)
 
-                output_tensor = output_tensor.squeeze(0).cpu()
-                enhanced_tile = self.inverse_transform(output_tensor)
+                    # Resize back to original tile size
+                    enhanced_tile = enhanced_tile_resized.resize(tile_original_size, Image.LANCZOS)
+                else:
+                    # Standard processing with padding for U-Net models
+                    input_tensor = self.transform(tile).unsqueeze(0).to(self.device)
+                    padded_tensor, (pad_h, pad_w) = self.pad_to_multiple(input_tensor, multiple=32)
+
+                    with torch.no_grad():
+                        output_tensor = self.model(padded_tensor)
+
+                    # Remove padding
+                    if pad_h > 0 or pad_w > 0:
+                        _, _, h, w = input_tensor.shape
+                        output_tensor = output_tensor[:, :, :h, :w]
+
+                    output_tensor = output_tensor.squeeze(0).cpu()
+                    enhanced_tile = self.inverse_transform(output_tensor)
 
                 # Convert to numpy array for blending
                 enhanced_array = np.array(enhanced_tile, dtype=np.float32)
@@ -361,7 +459,7 @@ class Inferencer:
 
     def process_image(self, image_path: Path, output_path: Path = None, progress_callback=None):
         """Process a single image
-        
+
         Args:
             image_path: Path to input image
             output_path: Optional output path for saving
@@ -370,41 +468,51 @@ class Inferencer:
         img = Image.open(image_path).convert('RGB')
         original_size = img.size
         width, height = original_size
-        
-        # Check if we should resize during inference
+
+        # Check model type and inference settings
+        model_type = self.config['model']['type']
         resize_inference = self.config.get('inference', {}).get('resize_inference', False)
-        
-        # Use tiling for large images to avoid memory issues
-        if not resize_inference and (width > 2048 or height > 2048):
-            logger.info(f"Large image detected ({width}x{height}), using tiled processing")
+
+        # Determine tile size threshold based on model type
+        if model_type == 'UShapeTransformer':
+            # For U-Shape Transformer, always use tiling to maintain max resolution
+            # Use smaller threshold since tiles will be model's img_dim (typically 256)
+            tile_threshold = self.config['model'].get('img_dim', 256)
+        else:
+            # For U-Net models, use tiling for large images
+            tile_threshold = 2048
+
+        # Use tiling for images larger than threshold (unless resize_inference is set)
+        if not resize_inference and (width > tile_threshold or height > tile_threshold):
+            logger.info(f"Processing {width}x{height} image with tiled approach for maximum resolution")
             output_img = self.process_image_tiled(image_path, progress_callback=progress_callback)
         elif resize_inference:
-            # Use training resolution
+            # User explicitly requested resize mode - process at training resolution
             input_tensor = self.transform(img).unsqueeze(0).to(self.device)
-            
+
             with torch.no_grad():
                 output_tensor = self.model(input_tensor)
-            
+
             output_tensor = output_tensor.squeeze(0).cpu()
             output_img = self.inverse_transform(output_tensor)
-            
+
             # Resize back to original size
             output_img = output_img.resize(original_size, Image.LANCZOS)
         else:
-            # Process at original resolution with padding
+            # Small images - process at original resolution with padding (U-Net only)
             input_tensor = self.transform(img).unsqueeze(0).to(self.device)
-            
-            # Pad to make dimensions compatible with U-Net
+
+            # Pad to make dimensions compatible with model
             padded_tensor, (pad_h, pad_w) = self.pad_to_multiple(input_tensor, multiple=32)
-            
+
             with torch.no_grad():
                 output_tensor = self.model(padded_tensor)
-            
+
             # Remove padding from output
             if pad_h > 0 or pad_w > 0:
                 _, _, h, w = input_tensor.shape
                 output_tensor = output_tensor[:, :, :h, :w]
-            
+
             output_tensor = output_tensor.squeeze(0).cpu()
             output_img = self.inverse_transform(output_tensor)
         
