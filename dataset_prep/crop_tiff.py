@@ -83,7 +83,12 @@ def center_crop_image(
         # Save cropped image with preserved metadata
         if preserve_format:
             # Keep original format with metadata
-            cropped.save(output_path, **metadata)
+            try:
+                cropped.save(output_path, **metadata)
+            except (TypeError, OSError) as e:
+                logger.warning(f"Failed to save with full metadata: {e}. Retrying with basic metadata.")
+                safe_metadata = {k: v for k, v in metadata.items() if k in ['exif', 'dpi']}
+                cropped.save(output_path, **safe_metadata)
         else:
             # Save as TIFF with metadata
             cropped.save(output_path, 'TIFF', compression='none', **metadata)
