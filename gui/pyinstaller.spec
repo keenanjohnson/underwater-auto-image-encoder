@@ -120,7 +120,6 @@ a = Analysis(
         'cv2',
         'tqdm',
         'yaml',
-        'skimage',
         'tkinter',
         'darkdetect',
         'distutils',  # Required by CustomTkinter
@@ -163,17 +162,13 @@ a = Analysis(
         'torchvision.datasets',      # Dataset loaders
         'torchvision.io.video',      # Video processing
 
-        # Exclude unused scikit-image modules (heavy)
-        'skimage.data',
-        'skimage.feature',
-        'skimage.segmentation',
-        'skimage.morphology',
-        'skimage.measure',
-        'skimage.restoration',
-        'skimage.draw',
-        'skimage.graph',
-        'skimage.future',
-        'skimage.registration',
+        # Exclude scikit-image entirely - not used by GUI
+        'skimage',
+
+        # Triton compiler - large and only needed for torch.compile()
+        'triton',
+        'triton.compiler',
+        'triton.runtime',
 
         # Other unused modules
         'tkinter.test',

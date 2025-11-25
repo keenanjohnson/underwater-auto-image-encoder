@@ -1,16 +1,18 @@
 """
 PyInstaller hook for PyTorch - collects all necessary components
-KEEPS CUDA SUPPORT - includes source files for JIT functionality
+KEEPS CUDA SUPPORT
 
-Note: CUDA libraries are highly interdependent and cannot be selectively excluded
+Size optimization: Only include essential data files, not Python source files
 """
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
 
-# Collect all PyTorch dynamic libraries (including CUDA)
-# IMPORTANT: include_py_files=True to include .py source files
-# PyTorch's JIT system needs access to source code via torch._sources
-datas = collect_data_files('torch', include_py_files=True)
+# Collect PyTorch dynamic libraries (including CUDA)
 binaries = collect_dynamic_libs('torch')
+
+# Collect only essential data files (not Python source files)
+# This saves significant space as PyTorch has many .py files
+# Note: If JIT compilation fails, set include_py_files=True
+datas = collect_data_files('torch', include_py_files=False)
 
 # Exclude heavy/unused PyTorch modules for inference-only use
 # These modules are not needed for running a trained model
