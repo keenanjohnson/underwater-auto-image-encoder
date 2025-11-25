@@ -108,21 +108,13 @@ for root, dirs, files in os.walk(src_path):
 # =============================================================================
 # CUDA/PyTorch Binary Filtering for Size Reduction
 # =============================================================================
-# These libraries are not needed for basic CNN inference (U-Net, transformers)
-# Filtering them can reduce executable size by 200-500MB while keeping CUDA support
+# Only exclude libraries that are truly optional for inference
+# Note: cusparse, cusolver, cufft are required by PyTorch even for basic operations
 EXCLUDED_CUDA_LIBS = [
-    # Sparse operations - not used in dense CNN inference
-    'cusparse',
-    # Linear algebra solver - not used in inference
-    'cusolver',
-    # FFT operations - not needed for standard convolutions
-    'cufft',
     # Multi-GPU communication - only for distributed training
     'nccl',
     # Tensor operations library - optional optimization
     'cutensor',
-    # cuBLAS Lite - redundant with cuBLAS
-    'cublasLt',
 ]
 
 def filter_binaries_for_size(binaries_list):
