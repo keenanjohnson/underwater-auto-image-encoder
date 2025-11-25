@@ -131,8 +131,16 @@ def filter_binaries_for_size(binaries_list):
     excluded_count = 0
     excluded_size = 0
 
-    for src, dest in binaries_list:
-        filename = os.path.basename(src).lower()
+    for binary_entry in binaries_list:
+        # PyInstaller binaries can be tuples of (dest_name, src_path, typecode)
+        # or (src_path, dest_path) depending on the stage
+        if len(binary_entry) >= 2:
+            # First element is typically the destination name or source path
+            filename = os.path.basename(str(binary_entry[0])).lower()
+            src_path = str(binary_entry[1]) if len(binary_entry) > 1 else str(binary_entry[0])
+        else:
+            filename = os.path.basename(str(binary_entry[0])).lower()
+            src_path = str(binary_entry[0])
 
         # Check if this binary should be excluded
         should_exclude = False
@@ -140,14 +148,14 @@ def filter_binaries_for_size(binaries_list):
             if lib.lower() in filename:
                 should_exclude = True
                 try:
-                    excluded_size += os.path.getsize(src)
+                    excluded_size += os.path.getsize(src_path)
                 except:
                     pass
                 excluded_count += 1
                 break
 
         if not should_exclude:
-            filtered.append((src, dest))
+            filtered.append(binary_entry)
 
     if excluded_count > 0:
         print(f"\n✓ Size optimization: Excluded {excluded_count} unnecessary CUDA libraries")
