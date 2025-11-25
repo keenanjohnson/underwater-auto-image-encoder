@@ -144,10 +144,47 @@ a = Analysis(
         # Even on Python 3.10, PyInstaller may need setuptools._distutils
         'wheel',
         'pip',
-        # Don't exclude ANY PyTorch or torchvision modules - they're too interdependent
-        # Excluding torchvision modules causes operator registration errors
-        # Exclude unused image processing
+
+        # PyTorch training modules (not needed for inference)
+        'torch.distributed',
+        'torch.optim',
+        'torch.ao.quantization',
+        'torch.quantization',
+        'torch.profiler',
+        'torch.utils.tensorboard',
+        'torch.utils.benchmark',
+        'torch.onnx',
+        'torch.package',
+        'torch.testing',
+
+        # Torchvision modules not needed for inference
+        'torchvision.datasets',      # Dataset loaders
+        'torchvision.io.video',      # Video processing
+
+        # Exclude unused scikit-image modules (heavy)
         'skimage.data',
+        'skimage.feature',
+        'skimage.segmentation',
+        'skimage.morphology',
+        'skimage.measure',
+        'skimage.restoration',
+        'skimage.draw',
+        'skimage.graph',
+        'skimage.future',
+        'skimage.registration',
+
+        # Other heavy unused modules
+        'tkinter.test',
+        'unittest',
+        'doctest',
+        'pydoc',
+        'email',
+        'html',
+        'http',
+        'xmlrpc',
+        'ftplib',
+        'cgi',
+        'cgitb',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

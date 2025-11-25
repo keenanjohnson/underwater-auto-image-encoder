@@ -1,6 +1,8 @@
 """
 PyInstaller hook for torchvision - collects all necessary components
-Includes C++ extensions and all modules for compatibility
+Includes C++ extensions and essential modules for inference
+
+Size optimization: Excludes datasets and video modules not needed for inference
 """
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_submodules
 import os
@@ -26,8 +28,24 @@ try:
 except ImportError:
     pass
 
-# Collect all torchvision submodules
-hiddenimports = collect_submodules('torchvision')
+# Collect torchvision submodules, filtering out unused ones
+all_submodules = collect_submodules('torchvision')
 
-# Don't exclude any torchvision modules
-excludedimports = []
+# Modules to exclude (not needed for inference)
+exclude_patterns = [
+    'torchvision.datasets',      # Dataset loaders (CIFAR, ImageNet, etc.)
+    'torchvision.io.video',      # Video I/O (large ffmpeg bindings)
+    'torchvision.prototype',     # Experimental features
+]
+
+hiddenimports = [
+    mod for mod in all_submodules
+    if not any(mod.startswith(excl) for excl in exclude_patterns)
+]
+
+# Exclude heavy modules not needed for inference
+excludedimports = [
+    'torchvision.datasets',
+    'torchvision.io.video',
+    'torchvision.prototype',
+]
