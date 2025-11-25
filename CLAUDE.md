@@ -7,253 +7,108 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Underwater image enhancement ML pipeline that automates manual GoPro RAW editing for Seattle Aquarium ROV surveys. Replaces time-intensive manual Adobe Lightroom editing with trained U-Net autoencoder.
+Underwater image enhancement ML pipeline that automates manual GoPro RAW editing for Seattle Aquarium ROV surveys. Replaces time-intensive manual Adobe Lightroom editing with trained deep learning models.
 
-## Common Development Commands
+## Environment Setup
 
-### Preprocessing GPR Files
 ```bash
-# Fast preprocessing (recommended) - uses parallel processing
-python preprocessing/preprocess_images_fast.py /path/to/gpr/files --output-dir processed
-
-# Standard preprocessing
-python preprocessing/preprocess_images.py /path/to/gpr/files --output-dir processed
+python3.10 -m venv env
+source env/bin/activate  # On Windows: env\Scripts\activate
+pip install -r requirements.txt  # Full dev (training + inference)
+pip install -r requirements_gui.txt  # GUI-only
 ```
 
-### Dataset Preparation
+## Common Commands
 
-#### From Hugging Face (Set-Based Structure)
-
-**Quick Start - All-in-One Script (Recommended for VMs):**
+### Training (All-in-One)
 ```bash
-# One command: download, prepare, crop, and train
 huggingface-cli login  # One-time setup
-python training/setup_and_train.py
+python training/setup_and_train.py  # Downloads dataset, prepares, trains
 
-# Custom parameters
-python training/setup_and_train.py --batch-size 4 --epochs 100 --skip-output-crop
-
-# Start fresh (cleanup and re-train)
-python training/cleanup_training.py --force && python training/setup_and_train.py --skip-download
-```
-
-**Manual Step-by-Step:**
-```bash
-# Authenticate
-huggingface-cli login
-
-# Download
-python dataset_prep/download_dataset.py --output dataset_raw
-
-# Prepare
-python dataset_prep/prepare_huggingface_dataset.py dataset_raw --output training_dataset
-
-# Crop (REQUIRED - images are different sizes)
-python dataset_prep/crop_tiff.py training_dataset/input --output-dir training_dataset/input_cropped --width 4606 --height 4030
-
-# Train
-python training/train.py --input-dir training_dataset/input_cropped --target-dir training_dataset/target
-```
-
-#### From Local Files
-```bash
-# Fast dataset preparation (recommended)
-python dataset_prep/prepare_dataset_fast.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
-
-# Standard dataset preparation
-python dataset_prep/prepare_dataset.py ./processed/cropped/ ./training_data/human_output_jpeg/ --output dataset
-
-# Create subset for testing
-python dataset_prep/create_subset.py --input-dir dataset --output-dir dataset_subset --num-samples 100
-```
-
-### Training
-```bash
-# Local training with U-Net (auto-detects GPU/CPU)
-python training/train.py
-
-# Resume training from checkpoint
+# Resume from checkpoint
 python training/train.py --resume checkpoints/checkpoint_epoch_10.pth
 
-# Monitor training progress
+# Monitor progress
 tensorboard --logdir logs
 ```
 
 ### Inference
 ```bash
-# Process single image
 python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth
-
-# Process directory with comparison
 python inference/inference.py /path/to/images --checkpoint checkpoints/best_model.pth --compare
-
-# Full resolution processing (uses tiled processing for >2048px)
 python inference/inference.py input.jpg --checkpoint checkpoints/best_model.pth --full-size
 ```
 
-### Post-Processing
+### GPR Preprocessing
 ```bash
-# Apply denoising to enhanced images
-python inference/denoise_tiff.py enhanced_images/ --output final_images/ --method bilateral
-
-# Compare denoising methods
-python inference/compare_denoise_methods.py input.tiff --output comparison.png
+python preprocessing/preprocess_images_fast.py /path/to/gpr/files --output-dir processed
 ```
 
-### Testing
+### GUI Development
 ```bash
-# Test preprocessing pipeline
-python tests/test_preprocessing.py
-
-# No formal test suite yet - evaluate visually using inference with --compare flag
+python gui/app.py  # Development mode
+pyinstaller gui/pyinstaller.spec --clean --noconfirm  # Build executable
+./dist/UnderwaterEnhancer --smoke-test  # Test build
 ```
 
-### Cleanup & Utilities
+### Cleanup
 ```bash
-# Preview what will be removed (safe)
-python training/cleanup_training.py --dry-run
-
-# Clean up all intermediate files (keeps raw dataset)
-python training/cleanup_training.py
-
-# Complete cleanup including raw dataset
-python training/cleanup_training.py --remove-raw-dataset --force
-
-# Keep specific artifacts
-python training/cleanup_training.py --keep-checkpoints --keep-outputs
-
-# See full cleanup guide
-cat CLEANUP_GUIDE.md
+python training/cleanup_training.py --dry-run  # Preview
+python training/cleanup_training.py --force  # Execute
 ```
 
 ## High-Level Architecture
 
-### Model Architecture (Standard U-Net)
-Located in `src/models/unet_autoencoder.py`:
-- **Encoder**: 5 levels (64→128→256→512→1024 channels)
-- **Decoder**: Symmetric upsampling with skip connections
-- **~31M parameters** optimized for underwater enhancement
-- Combined L1+MSE loss (80%/20% split) for detail preservation and color consistency
+### Model Architectures
+
+Two model options configured via `model:` in [setup_and_train_config.yaml](setup_and_train_config.yaml):
+
+| Model | File | Params | Use Case |
+|-------|------|--------|----------|
+| U-Net | [src/models/unet_autoencoder.py](src/models/unet_autoencoder.py) | ~31M | Faster training, good baseline |
+| U-shape Transformer | [src/models/ushape_transformer.py](src/models/ushape_transformer.py) | ~50M | Better quality, slower training |
+
+**U-Net**: 5-level encoder (64→128→256→512→1024 channels), symmetric decoder with skip connections. Combined L1+MSE loss (80%/20%).
+
+**U-shape Transformer**: CMSFFT (Cross-scale Multi-scale Fusion FFT) + SGFMT (Spatial-Gated Feed-forward Modulation Transformer) attention mechanisms.
 
 ### Data Pipeline
-1. **GPR Processing** ([preprocessing/preprocess_images.py](preprocessing/preprocess_images.py)):
-   - Uses gpr_tools for GPR→DNG conversion
-   - Center crops to 4606×4030
-   - Saves as TIFF for lossless processing
 
-2. **Dataset Organization** ([dataset_prep/prepare_dataset.py](dataset_prep/prepare_dataset.py)):
-   - Pairs raw/enhanced images
-   - Creates train/val splits (80/20)
-   - Handles file naming consistency
-
-3. **Training Loop** ([training/train.py](training/train.py)):
-   - Uses command-line arguments or setup_and_train_config.yaml for configuration
-   - Implements early stopping, learning rate scheduling
-   - Saves best model based on validation loss
-   - Generates validation comparisons every 5 epochs
-
-4. **Inference** ([inference/inference.py](inference/inference.py)):
-   - Handles arbitrary input sizes via tiled processing
-   - Supports batch processing of directories
-   - Creates side-by-side comparisons
-
-### Key Design Decisions
-- **PyTorch over TensorFlow**: Better community support for vision tasks
-- **U-Net over plain autoencoder**: Skip connections preserve fine details
-- **Tiled processing**: Enables full-resolution inference without memory limits
-- **Combined loss**: Balances sharpness (L1) with smooth gradients (MSE)
-
-## Dataset Structure
-
-### Hugging Face Dataset Structure (New Format)
 ```
-dataset_raw/           # Downloaded from HuggingFace
-├── set01/
-│   ├── input/        # Raw images for set 1
-│   └── output/       # Enhanced targets for set 1
-├── set02/
-│   ├── input/
-│   └── output/
-└── ...
-
-training_dataset/     # Prepared for training (after running prepare_hf_set_dataset.py)
-├── input/           # Combined inputs from all sets
-├── target/          # Combined targets from all sets
-└── split.txt        # Train/val split indices
+GPR Files → gpr_tools → DNG → TIFF (4606×4030) → Training patches (512×512)
 ```
 
-### Legacy Local Dataset Structure
-```
-dataset/
-├── input_GPR/          # Raw GPR input images (1000 samples)
-└── human_output_JPEG/  # Manually edited targets
+1. **GPR Processing** ([preprocessing/](preprocessing/)): gpr_tools converts GPR→DNG, center crops to 4606×4030, saves as TIFF
+2. **Dataset Prep** ([dataset_prep/](dataset_prep/)): Pairs raw/enhanced images, creates 80/20 train/val splits
+3. **Training** ([training/train.py](training/train.py)): Early stopping, LR scheduling, saves best model by validation loss
+4. **Inference** ([inference/inference.py](inference/inference.py)): Tiled processing for arbitrary sizes, batch support
 
-photos/                 # Full dataset (3414 pairs)
-├── input_GPR/
-└── human_output_JPEG/
-```
+### GUI Application
 
-## Configuration
-Training configuration is managed through:
-- **setup_and_train_config.yaml** - Main configuration file (see [SETUP_CONFIG.md](SETUP_CONFIG.md))
-- **Command-line arguments** - Override config file settings
+- **Framework**: NiceGUI with native desktop mode
+- **Packaging**: PyInstaller (outputs ~166MB with bundled PyTorch)
+- **Entry point**: [gui/app.py](gui/app.py)
+- **Core logic**: [src/gui/image_processor.py](src/gui/image_processor.py), [src/gui/main_window.py](src/gui/main_window.py)
+- **GPR support**: [src/converters/gpr_converter.py](src/converters/gpr_converter.py) + bundled `binaries/<platform>/gpr_tools`
 
-Key default settings:
-- `batch_size`: 16 (reduce for memory issues)
-- `image_size`: 512 (training patches)
-- `learning_rate`: 0.0001
-- `epochs`: 50
-- Loss weights: L1=0.8, MSE=0.2
+Build docs: [BUILD_README.md](BUILD_README.md) | macOS security: [gui/docs/MACOS_APP_INSTALLATION.md](gui/docs/MACOS_APP_INSTALLATION.md)
+
+### Key Configuration
+
+Training config in [setup_and_train_config.yaml](setup_and_train_config.yaml):
+- `model`: "unet" or "ushape_transformer"
+- `batch_size`: 12-16 (reduce for memory issues)
+- `image_size`: 512 (training patch size)
+- `epochs`: 150
 
 ## External Dependencies
-- **GPR Tools**: Install via `./build_scripts/compile_gpr_tools.sh` or build from https://github.com/keenanjohnson/gpr_tools (fork with MSVC fixes)
-- **Python 3.8+** with PyTorch, OpenCV, scikit-image
-- **CUDA GPU** recommended (auto-fallback to CPU)
 
-## Current Status (from TODO.md)
-- ✅ Dev environment setup
-- ✅ GPR preprocessing automation  
-- ✅ ML framework selection (PyTorch)
-- ✅ Model architecture (U-Net)
-- ✅ Model implementation
-- ✅ Initial training
-- ⏳ Performance evaluation
-- ⏳ Pipeline integration
-- 🆕 GUI Application development (in progress)
-
-## GUI Application Development
-
-**Design Document**: See `DESIGN_GUI.md` for complete GUI application design and implementation plan.
-
-### GUI Overview
-- **Framework**: NiceGUI with native desktop mode
-- **Packaging**: PyInstaller for standalone executable distribution
-- **Target Users**: Marine biologists at Seattle Aquarium
-- **Key Features**: Single/batch processing, native file dialogs, real-time preview
-
-### GUI Development Status
-- ✅ Design document completed
-- ✅ Technology selection (NiceGUI + PyInstaller)
-- ⏳ Phase 1: Core GUI implementation
-- ⏳ Phase 2: Enhanced features
-- ⏳ Phase 3: GPR support integration
-- ⏳ Phase 4: Polish & packaging
-
-### Running GUI Application
-```bash
-# Development mode
-python gui/app.py
-
-# Build standalone executable (run from project root)
-pyinstaller gui/pyinstaller.spec
-
-# Run packaged application
-./dist/UnderwaterEnhancer  # Linux/macOS
-./dist/UnderwaterEnhancer.exe  # Windows
-```
+- **GPR Tools**: `./build_scripts/compile_gpr_tools.sh` compiles from https://github.com/keenanjohnson/gpr_tools
+- **Hardware**: CUDA GPU recommended for training (~50x faster), CPU fine for inference
+- **Memory**: 12GB+ GPU RAM for batch_size=12-16 with image_size=512
 
 ## Resources
-- Discussion: https://github.com/Seattle-Aquarium/CCR_development/issues/29
-- Sample data: https://github.com/Seattle-Aquarium/CCR_development/tree/rmt_edits/files/ML_image_processing
-- Google Colab notebook: `train_underwater_enhancer_colab.ipynb`
-- GUI Design Document: `DESIGN_GUI.md`
+
+- Pre-trained models: https://huggingface.co/Seattle-Aquarium
+- Dataset: https://huggingface.co/datasets/Seattle-Aquarium/Seattle_Aquarium_benthic_imagery
+- Parent project: https://github.com/Seattle-Aquarium/CCR_development
