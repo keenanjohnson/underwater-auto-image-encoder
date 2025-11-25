@@ -1,8 +1,6 @@
 """
 PyInstaller hook for torchvision - collects all necessary components
-Includes C++ extensions and essential modules for inference
-
-Size optimization: Excludes datasets, video modules, and Python source files
+Includes C++ extensions and all modules for compatibility
 """
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_submodules
 import os
@@ -11,8 +9,8 @@ import glob
 # Collect torchvision dynamic libraries
 binaries = collect_dynamic_libs('torchvision')
 
-# Collect only essential data files (not Python source files for smaller size)
-datas = collect_data_files('torchvision', include_py_files=False)
+# Include Python source files for compatibility with PyTorch JIT
+datas = collect_data_files('torchvision', include_py_files=True)
 
 # Explicitly collect torchvision C++ extension libraries
 # These contain operators like torchvision::nms
