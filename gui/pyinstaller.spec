@@ -173,18 +173,9 @@ a = Analysis(
         'skimage.future',
         'skimage.registration',
 
-        # Other heavy unused modules
+        # Other unused modules
         'tkinter.test',
-        'unittest',
-        'doctest',
         'pydoc',
-        'email',
-        'html',
-        'http',
-        'xmlrpc',
-        'ftplib',
-        'cgi',
-        'cgitb',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
