@@ -30,24 +30,9 @@ try:
 except ImportError:
     pass
 
-# Collect torchvision submodules, filtering out unused ones
-all_submodules = collect_submodules('torchvision')
+# Collect all torchvision submodules
+# Note: Excluding modules can cause import errors, so include all
+hiddenimports = collect_submodules('torchvision')
 
-# Modules to exclude (not needed for inference)
-exclude_patterns = [
-    'torchvision.datasets',      # Dataset loaders (CIFAR, ImageNet, etc.)
-    'torchvision.io.video',      # Video I/O (large ffmpeg bindings)
-    'torchvision.prototype',     # Experimental features
-]
-
-hiddenimports = [
-    mod for mod in all_submodules
-    if not any(mod.startswith(excl) for excl in exclude_patterns)
-]
-
-# Exclude heavy modules not needed for inference
-excludedimports = [
-    'torchvision.datasets',
-    'torchvision.io.video',
-    'torchvision.prototype',
-]
+# Keep excludedimports empty for stability
+excludedimports = []

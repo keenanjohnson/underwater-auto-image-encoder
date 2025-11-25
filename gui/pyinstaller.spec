@@ -146,21 +146,8 @@ a = Analysis(
         'wheel',
         'pip',
 
-        # PyTorch training modules (not needed for inference)
-        'torch.distributed',
-        'torch.optim',
-        'torch.ao.quantization',
-        'torch.quantization',
-        'torch.profiler',
-        'torch.utils.tensorboard',
-        'torch.utils.benchmark',
-        'torch.onnx',
-        'torch.package',
-        'torch.testing',
-
-        # Torchvision modules not needed for inference
-        'torchvision.datasets',      # Dataset loaders
-        'torchvision.io.video',      # Video processing
+        # Note: PyTorch/torchvision modules are highly interdependent
+        # Excluding them causes circular import errors, so we don't exclude them
 
         # Exclude scikit-image entirely - not used by GUI
         'skimage',
