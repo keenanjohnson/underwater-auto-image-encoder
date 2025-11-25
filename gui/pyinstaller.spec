@@ -127,6 +127,7 @@ a = Analysis(
         'distutils.version',
         'setuptools._distutils',  # Compatibility layer for distutils
         'setuptools._distutils.version',
+        'pickletools',  # Required by PyTorch for model loading
     ] + src_hiddenimports,  # Add all src submodules
     hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
