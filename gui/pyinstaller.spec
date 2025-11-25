@@ -105,6 +105,56 @@ for root, dirs, files in os.walk(src_path):
 
 # Silently collect files (debug output removed)
 
+# =============================================================================
+# CUDA/PyTorch Binary Filtering for Size Reduction
+# =============================================================================
+# These libraries are not needed for basic CNN inference (U-Net, transformers)
+# Filtering them can reduce executable size by 200-500MB while keeping CUDA support
+EXCLUDED_CUDA_LIBS = [
+    # Sparse operations - not used in dense CNN inference
+    'cusparse',
+    # Linear algebra solver - not used in inference
+    'cusolver',
+    # FFT operations - not needed for standard convolutions
+    'cufft',
+    # Multi-GPU communication - only for distributed training
+    'nccl',
+    # Tensor operations library - optional optimization
+    'cutensor',
+    # cuBLAS Lite - redundant with cuBLAS
+    'cublasLt',
+]
+
+def filter_binaries_for_size(binaries_list):
+    """Filter out unnecessary CUDA libraries to reduce executable size."""
+    filtered = []
+    excluded_count = 0
+    excluded_size = 0
+
+    for src, dest in binaries_list:
+        filename = os.path.basename(src).lower()
+
+        # Check if this binary should be excluded
+        should_exclude = False
+        for lib in EXCLUDED_CUDA_LIBS:
+            if lib.lower() in filename:
+                should_exclude = True
+                try:
+                    excluded_size += os.path.getsize(src)
+                except:
+                    pass
+                excluded_count += 1
+                break
+
+        if not should_exclude:
+            filtered.append((src, dest))
+
+    if excluded_count > 0:
+        print(f"\n✓ Size optimization: Excluded {excluded_count} unnecessary CUDA libraries")
+        print(f"  Estimated size reduction: {excluded_size / (1024*1024):.1f} MB\n")
+
+    return filtered
+
 a = Analysis(
     [os.path.join(spec_dir, 'gui', 'app.py')],
     pathex=[spec_dir],  # Add absolute path to project root
@@ -185,6 +235,10 @@ a = Analysis(
     noarchive=False,
 )
 
+# Apply binary filtering for size reduction (Linux/Windows CUDA builds)
+if system != 'darwin':
+    a.binaries = filter_binaries_for_size(a.binaries)
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 if system == 'darwin':
@@ -228,7 +282,7 @@ else:
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
-        strip=False,
+        strip=True,  # Strip debug symbols for smaller size
         upx=True,
         upx_exclude=[],
         runtime_tmpdir=None,
