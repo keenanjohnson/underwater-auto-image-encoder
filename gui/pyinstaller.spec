@@ -105,56 +105,6 @@ for root, dirs, files in os.walk(src_path):
 
 # Silently collect files (debug output removed)
 
-# =============================================================================
-# CUDA/PyTorch Binary Filtering for Size Reduction
-# =============================================================================
-# Only exclude libraries that are truly optional for inference
-# Note: cusparse, cusolver, cufft are required by PyTorch even for basic operations
-EXCLUDED_CUDA_LIBS = [
-    # Multi-GPU communication - only for distributed training
-    'nccl',
-    # Tensor operations library - optional optimization
-    'cutensor',
-]
-
-def filter_binaries_for_size(binaries_list):
-    """Filter out unnecessary CUDA libraries to reduce executable size."""
-    filtered = []
-    excluded_count = 0
-    excluded_size = 0
-
-    for binary_entry in binaries_list:
-        # PyInstaller binaries can be tuples of (dest_name, src_path, typecode)
-        # or (src_path, dest_path) depending on the stage
-        if len(binary_entry) >= 2:
-            # First element is typically the destination name or source path
-            filename = os.path.basename(str(binary_entry[0])).lower()
-            src_path = str(binary_entry[1]) if len(binary_entry) > 1 else str(binary_entry[0])
-        else:
-            filename = os.path.basename(str(binary_entry[0])).lower()
-            src_path = str(binary_entry[0])
-
-        # Check if this binary should be excluded
-        should_exclude = False
-        for lib in EXCLUDED_CUDA_LIBS:
-            if lib.lower() in filename:
-                should_exclude = True
-                try:
-                    excluded_size += os.path.getsize(src_path)
-                except:
-                    pass
-                excluded_count += 1
-                break
-
-        if not should_exclude:
-            filtered.append(binary_entry)
-
-    if excluded_count > 0:
-        print(f"\n✓ Size optimization: Excluded {excluded_count} unnecessary CUDA libraries")
-        print(f"  Estimated size reduction: {excluded_size / (1024*1024):.1f} MB\n")
-
-    return filtered
-
 a = Analysis(
     [os.path.join(spec_dir, 'gui', 'app.py')],
     pathex=[spec_dir],  # Add absolute path to project root
@@ -234,10 +184,6 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
-
-# Apply binary filtering for size reduction (Linux/Windows CUDA builds)
-if system != 'darwin':
-    a.binaries = filter_binaries_for_size(a.binaries)
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
