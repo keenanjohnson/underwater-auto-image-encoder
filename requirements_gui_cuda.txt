@@ -1,0 +1,29 @@
+# GUI Requirements with CUDA support (Linux/Windows)
+# Install with: pip install -r requirements_gui_cuda.txt --index-url https://download.pytorch.org/whl/cu121
+#
+# For smaller builds, use CUDA 12.1 index which is well-optimized.
+# The --index-url ensures you get CUDA-enabled builds.
+
+# GUI Framework
+customtkinter==5.2.0
+darkdetect==0.8.0
+
+# Image Processing
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0  # Headless version is smaller (no GUI components)
+scikit-image>=0.21.0
+rawpy>=0.18.0  # For DNG to TIFF conversion
+imageio>=2.30.0  # For saving TIFF files
+
+# ML Dependencies - Use specific versions for size optimization
+# PyTorch 2.1+ has better size optimization
+torch>=2.1.0
+torchvision>=0.16.0
+numpy>=1.24.0
+
+# Utilities
+PyYAML>=6.0
+tqdm>=4.65.0
+
+# Packaging
+pyinstaller>=6.0.0

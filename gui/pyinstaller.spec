@@ -120,13 +120,14 @@ a = Analysis(
         'cv2',
         'tqdm',
         'yaml',
-        'skimage',
         'tkinter',
         'darkdetect',
         'distutils',  # Required by CustomTkinter
         'distutils.version',
         'setuptools._distutils',  # Compatibility layer for distutils
         'setuptools._distutils.version',
+        'pickletools',  # Required by PyTorch for model loading
+        'html.parser',  # Required by GUI components
     ] + src_hiddenimports,  # Add all src submodules
     hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
@@ -144,10 +145,21 @@ a = Analysis(
         # Even on Python 3.10, PyInstaller may need setuptools._distutils
         'wheel',
         'pip',
-        # Don't exclude ANY PyTorch or torchvision modules - they're too interdependent
-        # Excluding torchvision modules causes operator registration errors
-        # Exclude unused image processing
-        'skimage.data',
+
+        # Note: PyTorch/torchvision modules are highly interdependent
+        # Excluding them causes circular import errors, so we don't exclude them
+
+        # Exclude scikit-image entirely - not used by GUI
+        'skimage',
+
+        # Triton compiler - large and only needed for torch.compile()
+        'triton',
+        'triton.compiler',
+        'triton.runtime',
+
+        # Other unused modules
+        'tkinter.test',
+        'pydoc',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -198,9 +210,11 @@ else:
         name='UnderwaterEnhancer',
         debug=False,
         bootloader_ignore_signals=False,
-        strip=False,
+        strip=True,  # Strip debug symbols for smaller size
         upx=True,
-        upx_exclude=[],
+        # Exclude CUDA/NVIDIA DLLs from UPX compression to prevent corruption
+        upx_exclude=['cudart*.dll', 'cublas*.dll', 'cudnn*.dll', 'nvToolsExt*.dll',
+                     'nvcuda*.dll', 'nvrtc*.dll', 'cusparse*.dll', 'cufft*.dll'],
         runtime_tmpdir=None,
         console=False,  # Set to True for debugging
         disable_windowed_traceback=False,

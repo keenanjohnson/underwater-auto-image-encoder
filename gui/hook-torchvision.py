@@ -6,9 +6,11 @@ from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, co
 import os
 import glob
 
-# Collect torchvision dynamic libraries and source files
-datas = collect_data_files('torchvision', include_py_files=True)
+# Collect torchvision dynamic libraries
 binaries = collect_dynamic_libs('torchvision')
+
+# Include Python source files for compatibility with PyTorch JIT
+datas = collect_data_files('torchvision', include_py_files=True)
 
 # Explicitly collect torchvision C++ extension libraries
 # These contain operators like torchvision::nms
@@ -27,7 +29,8 @@ except ImportError:
     pass
 
 # Collect all torchvision submodules
+# Note: Excluding modules can cause import errors, so include all
 hiddenimports = collect_submodules('torchvision')
 
-# Don't exclude any torchvision modules
+# Keep excludedimports empty for stability
 excludedimports = []
