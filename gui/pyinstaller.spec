@@ -212,7 +212,9 @@ else:
         bootloader_ignore_signals=False,
         strip=True,  # Strip debug symbols for smaller size
         upx=True,
-        upx_exclude=[],
+        # Exclude CUDA/NVIDIA DLLs from UPX compression to prevent corruption
+        upx_exclude=['cudart*.dll', 'cublas*.dll', 'cudnn*.dll', 'nvToolsExt*.dll',
+                     'nvcuda*.dll', 'nvrtc*.dll', 'cusparse*.dll', 'cufft*.dll'],
         runtime_tmpdir=None,
         console=False,  # Set to True for debugging
         disable_windowed_traceback=False,
