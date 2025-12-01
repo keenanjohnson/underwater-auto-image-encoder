@@ -120,7 +120,6 @@ a = Analysis(
         'cv2',
         'tqdm',
         'yaml',
-        'skimage',
         'tkinter',
         'darkdetect',
         'distutils',  # Required by CustomTkinter
@@ -146,8 +145,6 @@ a = Analysis(
         'pip',
         # Don't exclude ANY PyTorch or torchvision modules - they're too interdependent
         # Excluding torchvision modules causes operator registration errors
-        # Exclude unused image processing
-        'skimage.data',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
