@@ -29,5 +29,14 @@ except ImportError:
 # Collect all torchvision submodules
 hiddenimports = collect_submodules('torchvision')
 
-# Don't exclude any torchvision modules
-excludedimports = []
+# Exclude unused torchvision modules to reduce size
+# We only use torchvision.transforms for inference
+excludedimports = [
+    'torchvision.datasets',      # Dataset loaders (ImageNet, CIFAR, etc.)
+    'torchvision.models',        # Pretrained models (VGG, ResNet, etc.) - huge!
+    'torchvision.models.detection',
+    'torchvision.models.segmentation',
+    'torchvision.models.video',
+    'torchvision.models.optical_flow',
+    'torchvision.models.quantization',
+]
