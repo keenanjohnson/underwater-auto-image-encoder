@@ -321,13 +321,16 @@ class Inferencer:
         
         return tensor, (pad_h, pad_w)
 
-    def process_image_tiled(self, image_path: Path, tile_size=None, overlap=128, progress_callback=None):
+    def process_image_tiled(self, image_path: Path, tile_size=None, overlap=128, margin=64, progress_callback=None):
         """Process large image using tiling with seamless blending to avoid artifacts
 
         Args:
             image_path: Path to input image
             tile_size: Size of each tile (default: 1024 for U-Net, img_dim for U-Shape Transformer)
             overlap: Overlap between tiles (used for blending)
+            margin: Extra pixels to process beyond tile edges (discarded after processing).
+                    This ensures the model has consistent context at blend boundaries,
+                    eliminating grid artifacts caused by edge effects.
             progress_callback: Optional callback(message) for progress updates
         """
         img = Image.open(image_path).convert('RGB')
@@ -339,13 +342,14 @@ class Inferencer:
         if tile_size is None:
             if model_type == 'UShapeTransformer':
                 tile_size = self.config['model'].get('img_dim', 256)
-                # Use smaller overlap for smaller tiles
+                # Use smaller overlap and margin for smaller tiles
                 overlap = min(overlap, tile_size // 4)
+                margin = min(margin, tile_size // 4)
                 logger.info(f"U-Shape Transformer: using tile_size={tile_size} (model img_dim)")
             else:
                 tile_size = 1024
 
-        logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles and {overlap}px overlap")
+        logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles, {overlap}px overlap, {margin}px margin")
         if progress_callback:
             progress_callback(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles")
 
@@ -363,34 +367,51 @@ class Inferencer:
         for y in range(0, height, tile_size - overlap):
             for x in range(0, width, tile_size - overlap):
                 current_tile += 1
-                # Define tile boundaries
+
+                # Define the tile boundaries (the region we want to keep)
                 x_end = min(x + tile_size, width)
                 y_end = min(y + tile_size, height)
-
                 tile_width = x_end - x
                 tile_height = y_end - y
 
-                # Extract tile
-                tile = img.crop((x, y, x_end, y_end))
-                tile_original_size = tile.size
+                # Calculate extended region with margin (for processing context)
+                # This ensures the model sees actual image content instead of
+                # reflection padding at tile boundaries
+                ext_x = max(0, x - margin)
+                ext_y = max(0, y - margin)
+                ext_x_end = min(width, x_end + margin)
+                ext_y_end = min(height, y_end + margin)
 
-                # For U-Shape Transformer, resize tile to exact model size if needed
-                if model_type == 'UShapeTransformer' and (tile_width != tile_size or tile_height != tile_size):
-                    # Resize to exact tile_size for model processing
-                    tile_resized = tile.resize((tile_size, tile_size), Image.LANCZOS)
+                # Track actual margins used (may be less at image edges)
+                margin_left = x - ext_x
+                margin_top = y - ext_y
+                margin_right = ext_x_end - x_end
+                margin_bottom = ext_y_end - y_end
+
+                # Extract extended tile (with margins for context)
+                extended_tile = img.crop((ext_x, ext_y, ext_x_end, ext_y_end))
+                extended_width, extended_height = extended_tile.size
+
+                # Process the extended tile through the model
+                if model_type == 'UShapeTransformer':
+                    # U-Shape Transformer requires fixed input size
+                    target_size = self.config['model'].get('img_dim', 256)
+
+                    # Resize extended tile to model size, process, resize back
+                    tile_resized = extended_tile.resize((target_size, target_size), Image.LANCZOS)
                     input_tensor = self.transform(tile_resized).unsqueeze(0).to(self.device)
 
                     with torch.no_grad():
                         output_tensor = self.model(input_tensor)
 
                     output_tensor = output_tensor.squeeze(0).cpu()
-                    enhanced_tile_resized = self.inverse_transform(output_tensor)
+                    enhanced_resized = self.inverse_transform(output_tensor)
 
-                    # Resize back to original tile size
-                    enhanced_tile = enhanced_tile_resized.resize(tile_original_size, Image.LANCZOS)
+                    # Resize back to extended tile size
+                    enhanced_extended = enhanced_resized.resize((extended_width, extended_height), Image.LANCZOS)
                 else:
-                    # Standard processing with padding for U-Net models
-                    input_tensor = self.transform(tile).unsqueeze(0).to(self.device)
+                    # U-Net models can handle variable sizes with padding
+                    input_tensor = self.transform(extended_tile).unsqueeze(0).to(self.device)
                     padded_tensor, (pad_h, pad_w) = self.pad_to_multiple(input_tensor, multiple=32)
 
                     with torch.no_grad():
@@ -402,7 +423,16 @@ class Inferencer:
                         output_tensor = output_tensor[:, :, :h, :w]
 
                     output_tensor = output_tensor.squeeze(0).cpu()
-                    enhanced_tile = self.inverse_transform(output_tensor)
+                    enhanced_extended = self.inverse_transform(output_tensor)
+
+                # Crop out the margins to get the tile we actually want
+                # The model has now processed with full context from neighboring pixels
+                enhanced_tile = enhanced_extended.crop((
+                    margin_left,
+                    margin_top,
+                    margin_left + tile_width,
+                    margin_top + tile_height
+                ))
 
                 # Convert to numpy array for blending
                 enhanced_array = np.array(enhanced_tile, dtype=np.float32)
@@ -442,9 +472,9 @@ class Inferencer:
                 output_array[y:y_end, x:x_end] += enhanced_array * mask[:, :, np.newaxis]
                 weight_array[y:y_end, x:x_end] += mask
 
-                logger.info(f"Processed tile ({x}, {y}) to ({x_end}, {y_end})")
+                logger.info(f"Processed tile ({x}, {y}) to ({x_end}, {y_end}) with margin context")
                 if progress_callback:
-                    progress_callback(f"Processed tile {current_tile}/{total_tiles} ({x}, {y}) to ({x_end}, {y_end})")
+                    progress_callback(f"Processed tile {current_tile}/{total_tiles}")
 
         # Normalize by weights to get final image
         # Avoid division by zero (shouldn't happen, but be safe)
