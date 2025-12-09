@@ -334,16 +334,10 @@ class Inferencer:
         original_size = img.size
         width, height = original_size
 
-        # For U-Shape Transformer, use the model's img_dim as tile size
+        # Default tile size is 1024 for all models
         model_type = self.config['model']['type']
         if tile_size is None:
-            if model_type == 'UShapeTransformer':
-                tile_size = self.config['model'].get('img_dim', 256)
-                # Use smaller overlap for smaller tiles
-                overlap = min(overlap, tile_size // 4)
-                logger.info(f"U-Shape Transformer: using tile_size={tile_size} (model img_dim)")
-            else:
-                tile_size = 1024
+            tile_size = 1024
 
         logger.info(f"Processing {width}x{height} image with {tile_size}x{tile_size} tiles and {overlap}px overlap")
         if progress_callback:
@@ -457,12 +451,13 @@ class Inferencer:
 
         return output_img
 
-    def process_image(self, image_path: Path, output_path: Path = None, progress_callback=None):
+    def process_image(self, image_path: Path, output_path: Path = None, tile_size: int = None, progress_callback=None):
         """Process a single image
 
         Args:
             image_path: Path to input image
             output_path: Optional output path for saving
+            tile_size: Optional tile size override (None = auto based on model type)
             progress_callback: Optional callback(message) for progress updates
         """
         img = Image.open(image_path).convert('RGB')
@@ -485,7 +480,7 @@ class Inferencer:
         # Use tiling for images larger than threshold (unless resize_inference is set)
         if not resize_inference and (width > tile_threshold or height > tile_threshold):
             logger.info(f"Processing {width}x{height} image with tiled approach for maximum resolution")
-            output_img = self.process_image_tiled(image_path, progress_callback=progress_callback)
+            output_img = self.process_image_tiled(image_path, tile_size=tile_size, progress_callback=progress_callback)
         elif resize_inference:
             # User explicitly requested resize mode - process at training resolution
             input_tensor = self.transform(img).unsqueeze(0).to(self.device)

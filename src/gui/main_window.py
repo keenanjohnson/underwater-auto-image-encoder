@@ -165,18 +165,35 @@ class UnderwaterEnhancerApp(ctk.CTk):
         # File info and format selection
         info_frame = ctk.CTkFrame(main_container)
         info_frame.pack(fill="x", pady=(0, 8))
-        
+
         self.files_label = ctk.CTkLabel(info_frame, text="Files Found: 0 images")
         self.files_label.pack(side="left", padx=15)
-        
-        ctk.CTkLabel(info_frame, text="Output Format:").pack(side="left", padx=(50, 10))
-        
+
+        ctk.CTkLabel(info_frame, text="Output Format:").pack(side="left", padx=(30, 10))
+
         self.format_var = ctk.StringVar(value="TIFF")
         self.tiff_radio = ctk.CTkRadioButton(info_frame, text="TIFF", variable=self.format_var, value="TIFF")
         self.tiff_radio.pack(side="left", padx=5)
-        
+
         self.jpeg_radio = ctk.CTkRadioButton(info_frame, text="JPEG", variable=self.format_var, value="JPEG")
         self.jpeg_radio.pack(side="left", padx=5)
+
+        # Tile size selection
+        ctk.CTkLabel(info_frame, text="Tile Size:").pack(side="left", padx=(30, 10))
+
+        self.tile_size_var = ctk.StringVar(value="Auto")
+        self.tile_size_menu = ctk.CTkOptionMenu(
+            info_frame,
+            variable=self.tile_size_var,
+            values=["Auto", "256", "512", "1024", "2048"],
+            width=100,
+            command=self.on_tile_size_change
+        )
+        self.tile_size_menu.pack(side="left", padx=5)
+
+        # Tile size info label (shows what Auto resolves to)
+        self.tile_info_label = ctk.CTkLabel(info_frame, text="", text_color="gray", font=ctk.CTkFont(size=11))
+        self.tile_info_label.pack(side="left", padx=(5, 15))
         
         # Progress Frame
         progress_frame = ctk.CTkFrame(main_container)
@@ -414,6 +431,13 @@ class UnderwaterEnhancerApp(ctk.CTk):
                 self.log(f"✓ Model loaded successfully - Using GPU: {device_name}")
             else:
                 self.log(f"✓ Model loaded successfully - Using CPU (GPU not available)")
+
+            # Get tile size setting
+            tile_size = self.get_tile_size()
+            if tile_size:
+                self.log(f"Tile size: {tile_size}×{tile_size} pixels (user-specified)")
+            else:
+                self.log("Tile size: Auto (using model default)")
             self.log("Full resolution processing enabled (with tiling for large images)")
             
             # Setup paths
@@ -447,6 +471,7 @@ class UnderwaterEnhancerApp(ctk.CTk):
                 self.input_files,
                 output_dir,
                 output_format,
+                tile_size=tile_size,
                 progress_callback=self.update_progress,
                 cancel_check=lambda: self.cancel_processing
             )
@@ -537,6 +562,21 @@ class UnderwaterEnhancerApp(ctk.CTk):
         self.process_btn.configure(state=state)
         self.tiff_radio.configure(state=state)
         self.jpeg_radio.configure(state=state)
+        self.tile_size_menu.configure(state=state)
+
+    def on_tile_size_change(self, value: str):
+        """Handle tile size selection change"""
+        if value == "Auto":
+            self.tile_info_label.configure(text="(uses model default)")
+        else:
+            self.tile_info_label.configure(text=f"({value}×{value} pixels)")
+
+    def get_tile_size(self) -> Optional[int]:
+        """Get the selected tile size, or None for auto"""
+        value = self.tile_size_var.get()
+        if value == "Auto":
+            return None
+        return int(value)
     
     def log(self, message: str):
         """Add message to log"""

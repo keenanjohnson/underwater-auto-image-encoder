@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 with open("gui/app.py") as f:
     version_match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', f.read())
-    version = version_match.group(1) if version_match else "0.2.0"
+    version = version_match.group(1) if version_match else "0.4.0"
 
 # Read long description from README
 readme_path = Path(__file__).parent / "gui" / "docs" / "GUI_README.md"

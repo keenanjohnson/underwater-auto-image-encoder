@@ -216,8 +216,8 @@ if system == 'darwin':
         icon=os.path.join(spec_dir, 'assets', 'icon.icns') if Path(os.path.join(spec_dir, 'assets', 'icon.icns')).exists() else None,
         bundle_identifier='com.seattleaquarium.underwaterenhancer',
         info_plist={
-            'CFBundleShortVersionString': '0.2.0',
-            'CFBundleVersion': '0.2.0',
+            'CFBundleShortVersionString': '0.4.0',
+            'CFBundleVersion': '0.4.0',
             'NSHighResolutionCapable': True,
             'LSMinimumSystemVersion': '10.13.0',
             'CFBundleExecutable': 'UnderwaterEnhancer',
