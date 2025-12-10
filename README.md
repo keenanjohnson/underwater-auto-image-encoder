@@ -5,6 +5,8 @@ Converts RAW GPR files to enhanced images matching manual Adobe Lightroom editin
 
 ### For People That Just Want to Process Images (GUI Application)
 
+<img width="977" height="710" alt="image" src="https://github.com/user-attachments/assets/baac3516-3aee-41a6-87eb-a230d30bdc3d" />
+
 **No programming required** - Desktop application available for Windows, macOS, and Linux.
 
 👉 **[See GUI Documentation](gui/README.md)**
