@@ -112,6 +112,7 @@ tensorboard --logdir logs
   - Increase for faster training on large GPUs
 - `--epochs` (default: 50): Number of training epochs
 - `--lr` (default: 0.0001): Learning rate
+- `--early-stopping` (default: 15): Stop training if validation loss doesn't improve for N epochs (0 to disable)
 
 ### Output Locations
 

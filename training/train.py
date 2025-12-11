@@ -353,6 +353,10 @@ def main():
     parser.add_argument('--model', type=str, default='unet', choices=['unet', 'ushape_transformer'],
                        help='Model architecture (default: unet)')
 
+    # Early stopping
+    parser.add_argument('--early-stopping', type=int, default=15,
+                       help='Early stopping patience - stop if val loss does not improve for N epochs (default: 15, 0 to disable)')
+
     args = parser.parse_args()
 
     # Set random seeds
@@ -484,6 +488,7 @@ def main():
     val_losses = []
     train_psnrs = []
     val_psnrs = []
+    patience_counter = 0
 
     # Resume from checkpoint
     if args.resume:
@@ -499,6 +504,7 @@ def main():
             val_losses = checkpoint.get('val_losses', [])
             train_psnrs = checkpoint.get('train_psnrs', [])
             val_psnrs = checkpoint.get('val_psnrs', [])
+            patience_counter = checkpoint.get('patience_counter', 0)
         else:
             logger.warning(f"Checkpoint not found: {checkpoint_path}")
 
@@ -538,6 +544,7 @@ def main():
             'train_psnrs': train_psnrs,
             'val_psnrs': val_psnrs,
             'best_val_loss': best_val_loss,
+            'patience_counter': patience_counter,
             'training_config': {
                 'resolution': resolution_str,
                 'batch_size': args.batch_size,
@@ -550,9 +557,10 @@ def main():
         latest_checkpoint = checkpoint_dir / 'latest_checkpoint.pth'
         torch.save(checkpoint, latest_checkpoint)
 
-        # Save best model
+        # Save best model and check early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            patience_counter = 0
             best_model_path = output_dir / 'best_model.pth'
 
             # Add model config for inference
@@ -565,6 +573,13 @@ def main():
 
             torch.save(checkpoint, best_model_path)
             logger.info(f"✓ Saved best model: {best_model_path}")
+        else:
+            patience_counter += 1
+            if args.early_stopping > 0:
+                logger.info(f"No improvement in val loss ({patience_counter}/{args.early_stopping})")
+                if patience_counter >= args.early_stopping:
+                    logger.info(f"Early stopping triggered after {epoch+1} epochs")
+                    break
 
         # Periodic checkpoint
         if (epoch + 1) % 5 == 0:

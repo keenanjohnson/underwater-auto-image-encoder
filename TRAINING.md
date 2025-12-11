@@ -69,7 +69,7 @@ python training/train.py \
 
 ### Training Control
 
-- `--patience` (default: 10): Early stopping patience (epochs without improvement)
+- `--early-stopping` (default: 15): Stop training if validation loss doesn't improve for N epochs (0 to disable)
 
 ## Example Workflows
 
