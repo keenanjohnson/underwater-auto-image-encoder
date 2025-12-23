@@ -551,8 +551,17 @@ def main():
     use_compile = args.compile
     if use_compile:
         if hasattr(torch, 'compile'):
-            logger.info("Compiling model with torch.compile (this may take a moment on first forward pass)...")
-            model = torch.compile(model, mode='reduce-overhead')
+            # Use 'default' mode when gradient checkpointing is enabled
+            # 'reduce-overhead' uses CUDA graphs which conflict with checkpointing's control flow
+            if use_gradient_checkpointing:
+                compile_mode = 'default'
+                logger.info("Using torch.compile with 'default' mode (gradient checkpointing enabled)")
+            else:
+                compile_mode = 'reduce-overhead'
+                logger.info("Using torch.compile with 'reduce-overhead' mode")
+
+            logger.info("Compiling model (this may take a moment on first forward pass)...")
+            model = torch.compile(model, mode=compile_mode)
             logger.info("Model compiled successfully")
         else:
             logger.warning("torch.compile requested but not available (requires PyTorch 2.0+)")
