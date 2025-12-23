@@ -383,6 +383,10 @@ def main():
     parser.add_argument('--amp', action='store_true',
                        help='Enable automatic mixed precision (FP16) training for reduced memory usage')
 
+    # Gradient checkpointing
+    parser.add_argument('--gradient-checkpointing', action='store_true',
+                       help='Enable gradient checkpointing to reduce memory usage (trades compute for memory)')
+
     args = parser.parse_args()
 
     # Set random seeds
@@ -480,6 +484,8 @@ def main():
         return
 
     # Create model based on selection
+    use_gradient_checkpointing = args.gradient_checkpointing
+
     if args.model == 'ushape_transformer':
         # U-shape Transformer requires specific image size (must be divisible by 16)
         model_img_size = image_size if image_size is not None else 256
@@ -491,12 +497,17 @@ def main():
             img_dim=model_img_size,
             in_ch=3,
             out_ch=3,
-            return_single=True  # Return single output for non-GAN training
+            return_single=True,  # Return single output for non-GAN training
+            gradient_checkpointing=use_gradient_checkpointing
         ).to(device)
         logger.info(f"Using U-shape Transformer model (img_dim={model_img_size})")
+        if use_gradient_checkpointing:
+            logger.info("Gradient checkpointing: ENABLED (memory-efficient mode)")
     else:
         model = UNetAutoencoder(n_channels=3, n_classes=3).to(device)
         logger.info("Using U-Net Autoencoder model")
+        if use_gradient_checkpointing:
+            logger.warning("Gradient checkpointing requested but not supported for U-Net model")
 
     total_params = sum(p.numel() for p in model.parameters())
     logger.info(f"Model parameters: {total_params:,}")
@@ -594,6 +605,7 @@ def main():
                 'image_size': image_size if image_size is not None else 4606,
                 'model': args.model,
                 'amp': use_amp,
+                'gradient_checkpointing': use_gradient_checkpointing,
             }
         }
         # Save scaler state for AMP
@@ -656,6 +668,7 @@ def main():
             'epochs': len(train_losses),
             'model': args.model,
             'amp': use_amp,
+            'gradient_checkpointing': use_gradient_checkpointing,
         }
     }
     torch.save(final_checkpoint, final_model_path)

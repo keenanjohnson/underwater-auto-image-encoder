@@ -260,6 +260,13 @@ Examples:
         help='Enable automatic mixed precision (FP16) training for reduced memory usage'
     )
 
+    parser.add_argument(
+        '--gradient-checkpointing',
+        action='store_true',
+        default=None,
+        help='Enable gradient checkpointing to reduce memory usage (trades compute for memory)'
+    )
+
     # Step control
     parser.add_argument(
         '--skip-download',
@@ -336,6 +343,8 @@ Examples:
     model = args.model or training_config.get('model', 'unet')
     # Handle amp: CLI flag takes precedence, then config, default False
     use_amp = args.amp if args.amp is not None else training_config.get('amp', False)
+    # Handle gradient_checkpointing: CLI flag takes precedence, then config, default False
+    use_gradient_checkpointing = args.gradient_checkpointing if args.gradient_checkpointing is not None else training_config.get('gradient_checkpointing', False)
 
     # Step control
     steps_config = config.get('steps', {})
@@ -509,6 +518,9 @@ Examples:
 
     if use_amp:
         cmd.append('--amp')
+
+    if use_gradient_checkpointing:
+        cmd.append('--gradient-checkpointing')
 
     run_command(cmd, "Train underwater enhancement model")
 

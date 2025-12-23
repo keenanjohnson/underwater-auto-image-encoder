@@ -37,6 +37,8 @@ training:
                  # ushape_transformer: U-shape Transformer with CMSFFT+SGFMT (~50M params)
   amp: false  # Enable automatic mixed precision (FP16) training
               # Reduces memory usage by ~40-50%, recommended for large models/images
+  gradient_checkpointing: false  # Enable gradient checkpointing for memory-efficient training
+                                 # Trades compute for memory (~50-70% memory reduction, ~20-30% slower)
 
 # Step Control (skip completed steps)
 steps:
