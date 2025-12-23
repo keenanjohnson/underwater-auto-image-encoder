@@ -39,6 +39,10 @@ training:
               # Reduces memory usage by ~40-50%, recommended for large models/images
   gradient_checkpointing: false  # Enable gradient checkpointing for memory-efficient training
                                  # Trades compute for memory (~50-70% memory reduction, ~20-30% slower)
+  optimizer_8bit: false  # Use 8-bit Adam optimizer (requires: pip install bitsandbytes)
+                         # Saves ~1.5-2GB memory from optimizer states
+  compile: false  # Use torch.compile for potential speedups and memory optimization
+                  # Requires PyTorch 2.0+, may have longer first-epoch compilation time
 
 # Step Control (skip completed steps)
 steps:

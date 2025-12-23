@@ -17,6 +17,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.amp import GradScaler, autocast
 from PIL import Image
+
+# Optional 8-bit optimizer support
+try:
+    import bitsandbytes as bnb
+    HAS_BITSANDBYTES = True
+except ImportError:
+    HAS_BITSANDBYTES = False
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
@@ -387,6 +394,14 @@ def main():
     parser.add_argument('--gradient-checkpointing', action='store_true',
                        help='Enable gradient checkpointing to reduce memory usage (trades compute for memory)')
 
+    # 8-bit optimizer
+    parser.add_argument('--optimizer-8bit', action='store_true',
+                       help='Use 8-bit Adam optimizer (requires bitsandbytes) for ~1.5-2GB memory savings')
+
+    # torch.compile
+    parser.add_argument('--compile', action='store_true',
+                       help='Use torch.compile for potential speedups and memory optimization (PyTorch 2.0+)')
+
     args = parser.parse_args()
 
     # Set random seeds
@@ -515,8 +530,33 @@ def main():
 
     # Loss and optimizer
     criterion = CombinedLoss(alpha=args.l1_weight, beta=args.mse_weight)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+
+    # Select optimizer
+    use_8bit_optimizer = args.optimizer_8bit
+    if use_8bit_optimizer:
+        if HAS_BITSANDBYTES:
+            optimizer = bnb.optim.Adam8bit(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+            logger.info("Using 8-bit Adam optimizer (bitsandbytes)")
+        else:
+            logger.warning("8-bit optimizer requested but bitsandbytes not installed. Falling back to standard Adam.")
+            logger.warning("Install with: pip install bitsandbytes")
+            optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+            use_8bit_optimizer = False
+    else:
+        optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+
+    # torch.compile for PyTorch 2.0+
+    use_compile = args.compile
+    if use_compile:
+        if hasattr(torch, 'compile'):
+            logger.info("Compiling model with torch.compile (this may take a moment on first forward pass)...")
+            model = torch.compile(model, mode='reduce-overhead')
+            logger.info("Model compiled successfully")
+        else:
+            logger.warning("torch.compile requested but not available (requires PyTorch 2.0+)")
+            use_compile = False
 
     # Mixed precision setup
     use_amp = args.amp and device.type == 'cuda'
@@ -606,6 +646,8 @@ def main():
                 'model': args.model,
                 'amp': use_amp,
                 'gradient_checkpointing': use_gradient_checkpointing,
+                'optimizer_8bit': use_8bit_optimizer,
+                'compile': use_compile,
             }
         }
         # Save scaler state for AMP
@@ -669,6 +711,8 @@ def main():
             'model': args.model,
             'amp': use_amp,
             'gradient_checkpointing': use_gradient_checkpointing,
+            'optimizer_8bit': use_8bit_optimizer,
+            'compile': use_compile,
         }
     }
     torch.save(final_checkpoint, final_model_path)

@@ -224,25 +224,29 @@ class LearnedPositionalEncoding(nn.Module):
 # ==============================================================================
 
 class SelfAttention(nn.Module):
-    """Self-attention mechanism for SGFMT"""
+    """Self-attention mechanism for SGFMT with Flash Attention support"""
     def __init__(self, dim, heads=8, qkv_bias=False, qk_scale=None, dropout_rate=0.0):
         super().__init__()
         self.num_heads = heads
-        head_dim = dim // heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.head_dim = dim // heads
+        self.scale = qk_scale or self.head_dim ** -0.5
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.dropout_rate = dropout_rate
         self.attn_drop = nn.Dropout(dropout_rate)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(dropout_rate)
 
     def forward(self, x):
         B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
-        attn = (q @ k.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+
+        # Use PyTorch's scaled_dot_product_attention for Flash Attention / Memory-Efficient Attention
+        # This automatically selects the best backend (FlashAttention, Memory-Efficient, or Math)
+        dropout_p = self.dropout_rate if self.training else 0.0
+        x = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p, scale=self.scale)
+
+        x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
