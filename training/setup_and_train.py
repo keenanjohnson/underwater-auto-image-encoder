@@ -253,6 +253,13 @@ Examples:
         help='Model architecture: unet or ushape_transformer'
     )
 
+    parser.add_argument(
+        '--amp',
+        action='store_true',
+        default=None,
+        help='Enable automatic mixed precision (FP16) training for reduced memory usage'
+    )
+
     # Step control
     parser.add_argument(
         '--skip-download',
@@ -327,6 +334,8 @@ Examples:
     checkpoint_dir = args.checkpoint_dir or training_config.get('checkpoint_dir', 'checkpoints')
     resume = args.resume or training_config.get('resume')
     model = args.model or training_config.get('model', 'unet')
+    # Handle amp: CLI flag takes precedence, then config, default False
+    use_amp = args.amp if args.amp is not None else training_config.get('amp', False)
 
     # Step control
     steps_config = config.get('steps', {})
@@ -497,6 +506,9 @@ Examples:
 
     if resume:
         cmd.extend(['--resume', resume])
+
+    if use_amp:
+        cmd.append('--amp')
 
     run_command(cmd, "Train underwater enhancement model")
 

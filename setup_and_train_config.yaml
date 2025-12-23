@@ -35,6 +35,8 @@ training:
   model: "unet"  # Model architecture: "unet" or "ushape_transformer"
                  # unet: Standard U-Net autoencoder (~31M params)
                  # ushape_transformer: U-shape Transformer with CMSFFT+SGFMT (~50M params)
+  amp: false  # Enable automatic mixed precision (FP16) training
+              # Reduces memory usage by ~40-50%, recommended for large models/images
 
 # Step Control (skip completed steps)
 steps:

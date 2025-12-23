@@ -15,6 +15,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.amp import GradScaler, autocast
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -264,8 +265,8 @@ def load_split(split_file, num_files):
         return train_indices, val_indices
 
 
-def train_epoch(model, dataloader, criterion, optimizer, device):
-    """Train for one epoch"""
+def train_epoch(model, dataloader, criterion, optimizer, device, scaler=None, use_amp=False):
+    """Train for one epoch with optional mixed precision"""
     model.train()
     total_loss = 0.0
     total_psnr = 0.0
@@ -276,13 +277,28 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
             inputs, targets = inputs.to(device), targets.to(device)
 
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optimizer.step()
+
+            if use_amp and scaler is not None:
+                # Mixed precision forward pass
+                with autocast(device_type='cuda', dtype=torch.float16):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, targets)
+
+                # Scaled backward pass
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                # Standard forward pass
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
 
             batch_loss = loss.item()
-            batch_psnr = calculate_psnr(outputs, targets).item()
+            # Calculate PSNR in FP32 for accuracy
+            with torch.no_grad():
+                batch_psnr = calculate_psnr(outputs.float(), targets.float()).item()
 
             total_loss += batch_loss
             total_psnr += batch_psnr
@@ -295,8 +311,8 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
     return total_loss / num_batches, total_psnr / num_batches
 
 
-def validate_epoch(model, dataloader, criterion, device):
-    """Validate for one epoch"""
+def validate_epoch(model, dataloader, criterion, device, use_amp=False):
+    """Validate for one epoch with optional mixed precision"""
     model.eval()
     total_loss = 0.0
     total_psnr = 0.0
@@ -307,11 +323,17 @@ def validate_epoch(model, dataloader, criterion, device):
             for inputs, targets in pbar:
                 inputs, targets = inputs.to(device), targets.to(device)
 
-                outputs = model(inputs)
-                loss = criterion(outputs, targets)
+                if use_amp:
+                    with autocast(device_type='cuda', dtype=torch.float16):
+                        outputs = model(inputs)
+                        loss = criterion(outputs, targets)
+                else:
+                    outputs = model(inputs)
+                    loss = criterion(outputs, targets)
 
                 batch_loss = loss.item()
-                batch_psnr = calculate_psnr(outputs, targets).item()
+                # Calculate PSNR in FP32 for accuracy
+                batch_psnr = calculate_psnr(outputs.float(), targets.float()).item()
 
                 total_loss += batch_loss
                 total_psnr += batch_psnr
@@ -356,6 +378,10 @@ def main():
     # Early stopping
     parser.add_argument('--early-stopping', type=int, default=15,
                        help='Early stopping patience - stop if val loss does not improve for N epochs (default: 15, 0 to disable)')
+
+    # Mixed precision training
+    parser.add_argument('--amp', action='store_true',
+                       help='Enable automatic mixed precision (FP16) training for reduced memory usage')
 
     args = parser.parse_args()
 
@@ -481,6 +507,18 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
+    # Mixed precision setup
+    use_amp = args.amp and device.type == 'cuda'
+    scaler = GradScaler() if use_amp else None
+
+    if args.amp and device.type != 'cuda':
+        logger.warning("AMP requested but not using CUDA - disabling mixed precision")
+    if use_amp:
+        logger.info("Mixed precision (AMP) training: ENABLED")
+        logger.info(f"Model size with FP16: ~{total_params * 2 / 1e6:.2f} MB")
+    else:
+        logger.info("Mixed precision (AMP) training: DISABLED")
+
     # Training state
     start_epoch = 0
     best_val_loss = float('inf')
@@ -505,6 +543,10 @@ def main():
             train_psnrs = checkpoint.get('train_psnrs', [])
             val_psnrs = checkpoint.get('val_psnrs', [])
             patience_counter = checkpoint.get('patience_counter', 0)
+            # Restore scaler state if available and using AMP
+            if use_amp and scaler is not None and 'scaler_state_dict' in checkpoint:
+                scaler.load_state_dict(checkpoint['scaler_state_dict'])
+                logger.info("Restored AMP scaler state from checkpoint")
         else:
             logger.warning(f"Checkpoint not found: {checkpoint_path}")
 
@@ -517,12 +559,13 @@ def main():
         logger.info("-" * 80)
 
         # Train
-        train_loss, train_psnr = train_epoch(model, train_loader, criterion, optimizer, device)
+        train_loss, train_psnr = train_epoch(model, train_loader, criterion, optimizer, device,
+                                              scaler=scaler, use_amp=use_amp)
         train_losses.append(train_loss)
         train_psnrs.append(train_psnr)
 
         # Validate
-        val_loss, val_psnr = validate_epoch(model, val_loader, criterion, device)
+        val_loss, val_psnr = validate_epoch(model, val_loader, criterion, device, use_amp=use_amp)
         val_losses.append(val_loss)
         val_psnrs.append(val_psnr)
 
@@ -550,8 +593,12 @@ def main():
                 'batch_size': args.batch_size,
                 'image_size': image_size if image_size is not None else 4606,
                 'model': args.model,
+                'amp': use_amp,
             }
         }
+        # Save scaler state for AMP
+        if use_amp and scaler is not None:
+            checkpoint['scaler_state_dict'] = scaler.state_dict()
 
         # Save latest checkpoint
         latest_checkpoint = checkpoint_dir / 'latest_checkpoint.pth'
@@ -608,6 +655,7 @@ def main():
             'batch_size': args.batch_size,
             'epochs': len(train_losses),
             'model': args.model,
+            'amp': use_amp,
         }
     }
     torch.save(final_checkpoint, final_model_path)
