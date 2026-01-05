@@ -6,6 +6,7 @@ dataset_cropped/
 dataset_hf/
 my_dataset/
 my_dataset_cropped/
+dataset_raw/
 
 
 # gpr_tools binaries
