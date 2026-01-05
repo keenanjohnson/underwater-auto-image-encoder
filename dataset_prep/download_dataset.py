@@ -200,7 +200,10 @@ def download_dataset(
 
             for set_dir in set_dirs:
                 set_input = set_dir / "input"
+                # Support both 'output' and 'target' folder naming
                 set_output = set_dir / "output"
+                if not set_output.exists():
+                    set_output = set_dir / "target"
 
                 if set_input.exists() and set_output.exists():
                     # Count TIFF files specifically
@@ -230,7 +233,7 @@ def download_dataset(
             logger.warning(f"\nWarning: Could not detect dataset structure in {output_path}")
             logger.warning(f"Expected either:")
             logger.warning(f"  - Legacy format: input/ and target/ directories")
-            logger.warning(f"  - Set-based format: set01/, set02/, etc. with input/ and output/ subdirectories")
+            logger.warning(f"  - Set-based format: set01/, set02/, etc. with input/ and output/ (or target/) subdirectories")
             logger.warning(f"\nThe download may have been interrupted. Try running again to resume.")
 
     return download_path
