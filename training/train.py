@@ -547,8 +547,9 @@ def main():
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
-    # torch.compile for PyTorch 2.0+
+    # torch.compile for PyTorch 2.0+ (deferred until after checkpoint loading)
     use_compile = args.compile
+    compile_mode = None
     if use_compile:
         if hasattr(torch, 'compile'):
             # Use 'default' mode when gradient checkpointing is enabled
@@ -559,10 +560,6 @@ def main():
             else:
                 compile_mode = 'reduce-overhead'
                 logger.info("Using torch.compile with 'reduce-overhead' mode")
-
-            logger.info("Compiling model (this may take a moment on first forward pass)...")
-            model = torch.compile(model, mode=compile_mode)
-            logger.info("Model compiled successfully")
         else:
             logger.warning("torch.compile requested but not available (requires PyTorch 2.0+)")
             use_compile = False
@@ -609,6 +606,12 @@ def main():
                 logger.info("Restored AMP scaler state from checkpoint")
         else:
             logger.warning(f"Checkpoint not found: {checkpoint_path}")
+
+    # Apply torch.compile after checkpoint loading to avoid state_dict key mismatches
+    if use_compile and compile_mode is not None:
+        logger.info("Compiling model (this may take a moment on first forward pass)...")
+        model = torch.compile(model, mode=compile_mode)
+        logger.info("Model compiled successfully")
 
     # Training loop
     logger.info(f"\nStarting training for {args.epochs} epochs")
