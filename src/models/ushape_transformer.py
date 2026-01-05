@@ -12,6 +12,7 @@ import numpy as np
 from torch.nn import Dropout, Softmax, Conv2d, LayerNorm
 from torch.nn import ModuleList, LeakyReLU
 from torch.nn.modules.utils import _pair
+from torch.utils.checkpoint import checkpoint
 
 
 # ==============================================================================
@@ -223,25 +224,28 @@ class LearnedPositionalEncoding(nn.Module):
 # ==============================================================================
 
 class SelfAttention(nn.Module):
-    """Self-attention mechanism for SGFMT"""
+    """Self-attention mechanism for SGFMT with Flash Attention support"""
     def __init__(self, dim, heads=8, qkv_bias=False, qk_scale=None, dropout_rate=0.0):
         super().__init__()
         self.num_heads = heads
-        head_dim = dim // heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.head_dim = dim // heads
+        self.scale = qk_scale or self.head_dim ** -0.5
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(dropout_rate)
+        self.dropout_rate = dropout_rate
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(dropout_rate)
 
     def forward(self, x):
         B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
-        attn = (q @ k.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+
+        # Use PyTorch's scaled_dot_product_attention for Flash Attention / Memory-Efficient Attention
+        # This automatically selects the best backend (FlashAttention, Memory-Efficient, or Math)
+        dropout_p = self.dropout_rate if self.training else 0.0
+        x = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p, scale=self.scale)
+
+        x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
@@ -297,19 +301,26 @@ class FeedForward(nn.Module):
 
 
 class TransformerModel(nn.Module):
-    """Transformer model for SGFMT"""
+    """Transformer model for SGFMT with optional gradient checkpointing"""
     def __init__(self, dim, depth, heads, mlp_dim, dropout_rate=0.1, attn_dropout_rate=0.1):
         super().__init__()
-        layers = []
+        self.gradient_checkpointing = False
+        self.layers = nn.ModuleList()
         for _ in range(depth):
-            layers.extend([
-                Residual(PreNormDrop(dim, dropout_rate, SelfAttention(dim, heads=heads, dropout_rate=attn_dropout_rate))),
-                Residual(PreNorm(dim, FeedForward(dim, mlp_dim, dropout_rate))),
-            ])
-        self.net = IntermediateSequential(*layers)
+            self.layers.append(
+                Residual(PreNormDrop(dim, dropout_rate, SelfAttention(dim, heads=heads, dropout_rate=attn_dropout_rate)))
+            )
+            self.layers.append(
+                Residual(PreNorm(dim, FeedForward(dim, mlp_dim, dropout_rate)))
+            )
 
     def forward(self, x):
-        return self.net(x)
+        for layer in self.layers:
+            if self.gradient_checkpointing and self.training:
+                x = checkpoint(layer, x, use_reentrant=False)
+            else:
+                x = layer(x)
+        return x
 
 
 # ==============================================================================
@@ -604,10 +615,11 @@ class Block_ViT(nn.Module):
 
 
 class Encoder(nn.Module):
-    """Encoder for CMSFFT"""
+    """Encoder for CMSFFT with optional gradient checkpointing"""
     def __init__(self, vis, channel_num, num_layers=4):
         super(Encoder, self).__init__()
         self.vis = vis
+        self.gradient_checkpointing = False
         self.layer = nn.ModuleList()
         self.encoder_norm1 = LayerNorm(channel_num[0], eps=1e-6)
         self.encoder_norm2 = LayerNorm(channel_num[1], eps=1e-6)
@@ -617,12 +629,24 @@ class Encoder(nn.Module):
             layer = Block_ViT(vis, channel_num)
             self.layer.append(copy.deepcopy(layer))
 
+    def _forward_block(self, layer_block, emb1, emb2, emb3, emb4):
+        """Helper for checkpointing - returns tuple without weights for memory efficiency"""
+        emb1, emb2, emb3, emb4, _ = layer_block(emb1, emb2, emb3, emb4)
+        return emb1, emb2, emb3, emb4
+
     def forward(self, emb1, emb2, emb3, emb4):
         attn_weights = []
         for layer_block in self.layer:
-            emb1, emb2, emb3, emb4, weights = layer_block(emb1, emb2, emb3, emb4)
-            if self.vis:
-                attn_weights.append(weights)
+            if self.gradient_checkpointing and self.training:
+                # Checkpoint doesn't work well with multiple outputs, so we use a wrapper
+                emb1, emb2, emb3, emb4 = checkpoint(
+                    self._forward_block, layer_block, emb1, emb2, emb3, emb4,
+                    use_reentrant=False
+                )
+            else:
+                emb1, emb2, emb3, emb4, weights = layer_block(emb1, emb2, emb3, emb4)
+                if self.vis:
+                    attn_weights.append(weights)
         emb1 = self.encoder_norm1(emb1) if emb1 is not None else None
         emb2 = self.encoder_norm2(emb2) if emb2 is not None else None
         emb3 = self.encoder_norm3(emb3) if emb3 is not None else None
@@ -711,7 +735,8 @@ class UShapeTransformer(nn.Module):
                  conv_patch_representation=True,
                  positional_encoding_type="learned",
                  use_eql=True,
-                 return_single=True):
+                 return_single=True,
+                 gradient_checkpointing=False):
         super(UShapeTransformer, self).__init__()
 
         assert embedding_dim % num_heads == 0
@@ -728,6 +753,7 @@ class UShapeTransformer(nn.Module):
         self.attn_dropout_rate = attn_dropout_rate
         self.conv_patch_representation = conv_patch_representation
         self.return_single = return_single
+        self._gradient_checkpointing = gradient_checkpointing
 
         self.num_patches = int((img_dim // patch_dim) ** 2)
         self.seq_length = self.num_patches
@@ -828,6 +854,35 @@ class UShapeTransformer(nn.Module):
         self.Up_conv2_1 = conv_block(32, 32)
 
         self.Conv = nn.Conv2d(32, self.out_ch, kernel_size=1, stride=1, padding=0)
+
+        # Apply gradient checkpointing if requested
+        if gradient_checkpointing:
+            self.enable_gradient_checkpointing()
+
+    def enable_gradient_checkpointing(self):
+        """Enable gradient checkpointing for memory-efficient training"""
+        self._gradient_checkpointing = True
+        # Enable on SGFMT transformer
+        self.transformer.gradient_checkpointing = True
+        # Enable on CMSFFT encoder
+        self.mtc.encoder.gradient_checkpointing = True
+
+    def disable_gradient_checkpointing(self):
+        """Disable gradient checkpointing"""
+        self._gradient_checkpointing = False
+        self.transformer.gradient_checkpointing = False
+        self.mtc.encoder.gradient_checkpointing = False
+
+    @property
+    def gradient_checkpointing(self):
+        return self._gradient_checkpointing
+
+    @gradient_checkpointing.setter
+    def gradient_checkpointing(self, value):
+        if value:
+            self.enable_gradient_checkpointing()
+        else:
+            self.disable_gradient_checkpointing()
 
     def reshape_output(self, x):
         """Reshape transformer output back to feature map dimensions"""

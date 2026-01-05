@@ -253,6 +253,30 @@ Examples:
         help='Model architecture: unet or ushape_transformer'
     )
 
+    parser.add_argument(
+        '--amp',
+        action='store_true',
+        help='Enable automatic mixed precision (FP16) training for reduced memory usage'
+    )
+
+    parser.add_argument(
+        '--gradient-checkpointing',
+        action='store_true',
+        help='Enable gradient checkpointing to reduce memory usage (trades compute for memory)'
+    )
+
+    parser.add_argument(
+        '--optimizer-8bit',
+        action='store_true',
+        help='Use 8-bit Adam optimizer (requires bitsandbytes) for ~1.5-2GB memory savings'
+    )
+
+    parser.add_argument(
+        '--compile',
+        action='store_true',
+        help='Use torch.compile for potential speedups and memory optimization (PyTorch 2.0+)'
+    )
+
     # Step control
     parser.add_argument(
         '--skip-download',
@@ -327,6 +351,14 @@ Examples:
     checkpoint_dir = args.checkpoint_dir or training_config.get('checkpoint_dir', 'checkpoints')
     resume = args.resume or training_config.get('resume')
     model = args.model or training_config.get('model', 'unet')
+    # Handle amp: CLI flag takes precedence (when True), then config, default False
+    use_amp = args.amp or training_config.get('amp', False)
+    # Handle gradient_checkpointing: CLI flag takes precedence (when True), then config, default False
+    use_gradient_checkpointing = args.gradient_checkpointing or training_config.get('gradient_checkpointing', False)
+    # Handle optimizer_8bit: CLI flag takes precedence (when True), then config, default False
+    use_optimizer_8bit = args.optimizer_8bit or training_config.get('optimizer_8bit', False)
+    # Handle compile: CLI flag takes precedence (when True), then config, default False
+    use_compile = args.compile or training_config.get('compile', False)
 
     # Step control
     steps_config = config.get('steps', {})
@@ -497,6 +529,18 @@ Examples:
 
     if resume:
         cmd.extend(['--resume', resume])
+
+    if use_amp:
+        cmd.append('--amp')
+
+    if use_gradient_checkpointing:
+        cmd.append('--gradient-checkpointing')
+
+    if use_optimizer_8bit:
+        cmd.append('--optimizer-8bit')
+
+    if use_compile:
+        cmd.append('--compile')
 
     run_command(cmd, "Train underwater enhancement model")
 
