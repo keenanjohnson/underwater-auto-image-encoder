@@ -569,7 +569,7 @@ def main():
 
     # Mixed precision setup
     use_amp = args.amp and device.type == 'cuda'
-    scaler = GradScaler() if use_amp else None
+    scaler = GradScaler('cuda') if use_amp else None
 
     if args.amp and device.type != 'cuda':
         logger.warning("AMP requested but not using CUDA - disabling mixed precision")
