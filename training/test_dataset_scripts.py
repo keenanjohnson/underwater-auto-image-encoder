@@ -17,7 +17,7 @@ def create_mock_image(path, size=(100, 100), color=(255, 0, 0)):
     img.save(path)
 
 
-def create_mock_set_dataset(root_dir, num_sets=2, images_per_set=5):
+def create_mock_set_dataset(root_dir, num_sets=2, images_per_set=5, use_target_naming=False):
     """
     Create a mock dataset with set-based structure.
 
@@ -25,14 +25,17 @@ def create_mock_set_dataset(root_dir, num_sets=2, images_per_set=5):
         root_dir: Root directory for the mock dataset
         num_sets: Number of set directories to create
         images_per_set: Number of image pairs per set
+        use_target_naming: If True, use 'target' instead of 'output' for enhanced images folder
     """
     root = Path(root_dir)
     root.mkdir(parents=True, exist_ok=True)
 
+    target_folder_name = "target" if use_target_naming else "output"
+
     for set_idx in range(1, num_sets + 1):
         set_dir = root / f"set{set_idx:02d}"
         input_dir = set_dir / "input"
-        output_dir = set_dir / "output"
+        output_dir = set_dir / target_folder_name
 
         input_dir.mkdir(parents=True, exist_ok=True)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -49,6 +52,7 @@ def create_mock_set_dataset(root_dir, num_sets=2, images_per_set=5):
     print(f"✓ Created mock dataset in {root}")
     print(f"  Sets: {num_sets}")
     print(f"  Images per set: {images_per_set}")
+    print(f"  Target folder naming: '{target_folder_name}'")
     print(f"  Total pairs: {num_sets * images_per_set}")
 
 
@@ -184,6 +188,63 @@ def test_single_set():
             return False
 
 
+def test_target_folder_naming():
+    """Test processing datasets using 'target' folder naming instead of 'output'."""
+    print("\n" + "=" * 80)
+    print("Testing 'target' folder naming convention")
+    print("=" * 80)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dataset_dir = Path(tmpdir) / "mock_dataset"
+        output_dir = Path(tmpdir) / "prepared_dataset"
+
+        # Create mock dataset with 'target' naming
+        print("\n1. Creating mock dataset with 'target' folder naming...")
+        create_mock_set_dataset(dataset_dir, num_sets=2, images_per_set=5, use_target_naming=True)
+
+        # Test processing
+        print("\n2. Testing dataset processing...")
+
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "prepare_huggingface_dataset",
+            "prepare_huggingface_dataset.py"
+        )
+        prepare_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(prepare_module)
+
+        try:
+            prepare_module.prepare_dataset(
+                source_dirs=[str(dataset_dir)],
+                output_dir=str(output_dir),
+                symlink=False,
+                split_ratio=0.8
+            )
+
+            input_files = list((output_dir / "input").glob("img_*.tif"))
+            target_files = list((output_dir / "target").glob("img_*.jpg"))
+
+            print(f"\n3. Verification:")
+            print(f"  ✓ Processed 'target' folder naming successfully")
+            print(f"  ✓ Found {len(input_files)} input files (expected 10)")
+            print(f"  ✓ Found {len(target_files)} target files (expected 10)")
+
+            assert len(input_files) == 10, f"Expected 10 input files, got {len(input_files)}"
+            assert len(target_files) == 10, f"Expected 10 target files, got {len(target_files)}"
+
+            print("\n" + "=" * 80)
+            print("✓ Target folder naming test passed!")
+            print("=" * 80)
+
+            return True
+
+        except Exception as e:
+            print(f"\n✗ Test failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 if __name__ == "__main__":
     print("Dataset Preparation Script Tests")
     print("=" * 80)
@@ -191,14 +252,16 @@ if __name__ == "__main__":
     # Run tests
     test1_passed = test_prepare_script()
     test2_passed = test_single_set()
+    test3_passed = test_target_folder_naming()
 
     print("\n" + "=" * 80)
     print("Test Summary")
     print("=" * 80)
     print(f"Multi-set processing: {'✓ PASSED' if test1_passed else '✗ FAILED'}")
     print(f"Single-set processing: {'✓ PASSED' if test2_passed else '✗ FAILED'}")
+    print(f"Target folder naming: {'✓ PASSED' if test3_passed else '✗ FAILED'}")
 
-    if test1_passed and test2_passed:
+    if test1_passed and test2_passed and test3_passed:
         print("\n✓ All tests passed!")
         exit(0)
     else:

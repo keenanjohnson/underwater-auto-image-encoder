@@ -3,7 +3,8 @@
 Prepare dataset from Hugging Face set-based format.
 
 Handles the HuggingFace dataset structure where images are organized into
-set directories (set01/, set02/, etc.), each containing input/ and output/ subdirectories.
+set directories (set01/, set02/, etc.), each containing input/ and output/ (or target/)
+subdirectories. Both 'output' and 'target' naming conventions are supported.
 
 This script can:
 - Process a single set directory
@@ -28,10 +29,22 @@ def find_set_directories(root_dir: Path):
     return set_dirs
 
 
+def get_target_dir(set_dir: Path):
+    """Get the target/output directory, supporting both 'output' and 'target' naming."""
+    output_dir = set_dir / "output"
+    target_dir = set_dir / "target"
+
+    if output_dir.exists():
+        return output_dir
+    elif target_dir.exists():
+        return target_dir
+    return None
+
+
 def count_images_in_set(set_dir: Path):
     """Count input and output images in a set directory."""
     input_dir = set_dir / "input"
-    output_dir = set_dir / "output"
+    target_dir = get_target_dir(set_dir)
 
     input_count = 0
     output_count = 0
@@ -39,8 +52,8 @@ def count_images_in_set(set_dir: Path):
     if input_dir.exists():
         input_count = len([f for f in input_dir.iterdir() if f.is_file() and not f.name.startswith('.')])
 
-    if output_dir.exists():
-        output_count = len([f for f in output_dir.iterdir() if f.is_file() and not f.name.startswith('.')])
+    if target_dir is not None:
+        output_count = len([f for f in target_dir.iterdir() if f.is_file() and not f.name.startswith('.')])
 
     return input_count, output_count
 
@@ -53,10 +66,10 @@ def find_image_pairs(set_dir: Path):
         List of tuples: [(input_path, output_path), ...]
     """
     input_dir = set_dir / "input"
-    output_dir = set_dir / "output"
+    output_dir = get_target_dir(set_dir)
 
-    if not input_dir.exists() or not output_dir.exists():
-        logger.warning(f"Missing input or output directory in {set_dir}")
+    if not input_dir.exists() or output_dir is None:
+        logger.warning(f"Missing input or output/target directory in {set_dir}")
         return []
 
     # Get all input files (various extensions)
@@ -126,7 +139,7 @@ def prepare_dataset(
             continue
 
         # Check if this is a single set directory or contains multiple sets
-        if (source_path / "input").exists() and (source_path / "output").exists():
+        if (source_path / "input").exists() and get_target_dir(source_path) is not None:
             # This is a single set directory
             logger.info(f"Processing set: {source_path.name}")
             pairs = find_image_pairs(source_path)
