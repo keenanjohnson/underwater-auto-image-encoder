@@ -232,7 +232,6 @@ class SelfAttention(nn.Module):
         self.scale = qk_scale or self.head_dim ** -0.5
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.dropout_rate = dropout_rate
-        self.attn_drop = nn.Dropout(dropout_rate)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(dropout_rate)
 
