@@ -200,7 +200,14 @@ Examples:
         '--image-size',
         type=int,
         default=None,
-        help='Training image size'
+        help='Training patch size'
+    )
+
+    parser.add_argument(
+        '--patches-per-image',
+        type=int,
+        default=None,
+        help='Number of random patches to extract per image per epoch'
     )
 
     parser.add_argument(
@@ -344,6 +351,7 @@ Examples:
     # Training config
     training_config = config.get('training', {})
     image_size = args.image_size or training_config.get('image_size', 1024)
+    patches_per_image = args.patches_per_image or training_config.get('patches_per_image', 1)
     batch_size = args.batch_size or training_config.get('batch_size', 8)
     epochs = args.epochs or training_config.get('epochs', 50)
     lr = args.lr or training_config.get('learning_rate', 1e-4)
@@ -505,6 +513,7 @@ Examples:
         logger.info(f"    --input-dir {input_cropped_dir} \\")
         logger.info(f"    --target-dir {target_cropped_dir} \\")
         logger.info(f"    --image-size {image_size} \\")
+        logger.info(f"    --patches-per-image {patches_per_image} \\")
         logger.info(f"    --batch-size {batch_size} \\")
         logger.info(f"    --epochs {epochs} \\")
         logger.info(f"    --model {model}")
@@ -519,6 +528,7 @@ Examples:
         '--input-dir', str(input_cropped_dir),
         '--target-dir', str(target_cropped_dir),
         '--image-size', str(image_size),
+        '--patches-per-image', str(patches_per_image),
         '--batch-size', str(batch_size),
         '--epochs', str(epochs),
         '--lr', str(lr),

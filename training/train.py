@@ -41,19 +41,23 @@ logger = logging.getLogger(__name__)
 
 
 class UnderwaterDataset(Dataset):
-    """Dataset that supports flexible image sizes including full-resolution"""
+    """Dataset that extracts random patches from full-resolution images"""
 
-    def __init__(self, input_dir, target_dir, file_indices, image_size=512, augment=False):
+    def __init__(self, input_dir, target_dir, file_indices, image_size=512,
+                 patches_per_image=1, augment=False):
         """
         Args:
-            image_size: Target size. Can be:
-                       - int: Square images (e.g., 512 -> 512×512)
-                       - tuple: (width, height)
-                       - None: Use original full size (no resize)
+            input_dir: Directory with input images
+            target_dir: Directory with target images
+            file_indices: List of file indices to use
+            image_size: Patch size to extract (e.g., 512 -> 512×512 patches)
+            patches_per_image: Number of random patches to extract per image per epoch
+            augment: Whether to apply augmentation (flips)
         """
         self.input_dir = Path(input_dir)
         self.target_dir = Path(target_dir)
         self.image_size = image_size
+        self.patches_per_image = patches_per_image
         self.augment = augment
 
         # Get all files with various image extensions
@@ -69,57 +73,78 @@ class UnderwaterDataset(Dataset):
         # Select files based on indices
         self.input_files = [all_input_files[i] for i in valid_indices]
         self.target_files = [all_target_files[i] for i in valid_indices]
+        self.num_images = len(self.input_files)
 
-        # Define transforms based on image_size
-        if image_size is not None:
-            # Convert single int to tuple
-            if isinstance(image_size, int):
-                resize_size = (image_size, image_size)
-            else:
-                resize_size = image_size
+        # Pre-generate random patch positions (re-randomize each epoch)
+        self.patch_positions = []
+        self._generate_patch_positions()
 
-            transform_list = [
-                transforms.Resize(resize_size),
-                transforms.ToTensor(),
-            ]
-        else:
-            # Full-size: no resizing
-            transform_list = [transforms.ToTensor()]
+        # Simple transforms (no resize - we extract patches directly)
+        self.to_tensor = transforms.ToTensor()
 
-        if augment:
-            # Add augmentation for training
-            self.transform = transforms.Compose([
-                transforms.RandomHorizontalFlip(p=0.5),
-                transforms.RandomVerticalFlip(p=0.5),
-                *transform_list
-            ])
-        else:
-            self.transform = transforms.Compose(transform_list)
+    def _generate_patch_positions(self):
+        """Generate random patch positions for all images.
+        Call this at the start of each epoch to get new random patches."""
+        self.patch_positions = []
+
+        for img_idx in range(self.num_images):
+            for _ in range(self.patches_per_image):
+                self.patch_positions.append(img_idx)
+
+    def reshuffle_patches(self):
+        """Reshuffle patch positions for a new epoch.
+        Should be called at the start of each training epoch."""
+        self._generate_patch_positions()
+        logger.debug(f"Reshuffled patches: {len(self.patch_positions)} patches from {self.num_images} images")
 
     def __len__(self):
-        return len(self.input_files)
+        return len(self.patch_positions)
 
     def __getitem__(self, idx):
+        # Get the image index for this patch
+        img_idx = self.patch_positions[idx]
+
         # Load images
-        input_path = self.input_dir / self.input_files[idx]
-        target_path = self.target_dir / self.target_files[idx]
+        input_path = self.input_dir / self.input_files[img_idx]
+        target_path = self.target_dir / self.target_files[img_idx]
 
         input_img = Image.open(input_path).convert('RGB')
         target_img = Image.open(target_path).convert('RGB')
 
-        # Apply transforms
-        if self.augment:
-            # Apply same random transform to both images
-            seed = torch.randint(0, 2**32, (1,)).item()
-            torch.manual_seed(seed)
-            input_img = self.transform(input_img)
-            torch.manual_seed(seed)
-            target_img = self.transform(target_img)
-        else:
-            input_img = self.transform(input_img)
-            target_img = self.transform(target_img)
+        # Get image dimensions
+        width, height = input_img.size
 
-        return input_img, target_img
+        # Calculate valid crop region
+        if self.image_size is not None:
+            patch_size = self.image_size
+            max_x = max(0, width - patch_size)
+            max_y = max(0, height - patch_size)
+
+            # Random crop position
+            x = np.random.randint(0, max_x + 1) if max_x > 0 else 0
+            y = np.random.randint(0, max_y + 1) if max_y > 0 else 0
+
+            # Extract the same patch from both images
+            input_img = input_img.crop((x, y, x + patch_size, y + patch_size))
+            target_img = target_img.crop((x, y, x + patch_size, y + patch_size))
+
+        # Apply augmentation
+        if self.augment:
+            # Random horizontal flip
+            if np.random.random() > 0.5:
+                input_img = input_img.transpose(Image.FLIP_LEFT_RIGHT)
+                target_img = target_img.transpose(Image.FLIP_LEFT_RIGHT)
+
+            # Random vertical flip
+            if np.random.random() > 0.5:
+                input_img = input_img.transpose(Image.FLIP_TOP_BOTTOM)
+                target_img = target_img.transpose(Image.FLIP_TOP_BOTTOM)
+
+        # Convert to tensors
+        input_tensor = self.to_tensor(input_img)
+        target_tensor = self.to_tensor(target_img)
+
+        return input_tensor, target_tensor
 
 
 class DoubleConv(nn.Module):
@@ -363,7 +388,9 @@ def main():
 
     # Training arguments
     parser.add_argument('--image-size', type=int, default=1024,
-                       help='Training image size (use 0 for full-size, default: 1024)')
+                       help='Training patch size (use 0 for full-size, default: 1024)')
+    parser.add_argument('--patches-per-image', type=int, default=1,
+                       help='Number of random patches to extract per image per epoch (default: 1)')
     parser.add_argument('--batch-size', type=int, default=16, help='Batch size (default: 16)')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs (default: 50)')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate (default: 1e-4)')
@@ -450,18 +477,25 @@ def main():
 
     # Create datasets
     image_size = None if args.image_size == 0 else args.image_size
+    patches_per_image = args.patches_per_image
     resolution_str = "Full-size" if image_size is None else f"{image_size}×{image_size}"
 
-    logger.info(f"Training resolution: {resolution_str}")
+    logger.info(f"Training patch size: {resolution_str}")
+    logger.info(f"Patches per image: {patches_per_image}")
     logger.info(f"Batch size: {args.batch_size}")
 
     train_dataset = UnderwaterDataset(input_dir, target_dir, train_indices,
-                                     image_size=image_size, augment=True)
+                                     image_size=image_size,
+                                     patches_per_image=patches_per_image,
+                                     augment=True)
     val_dataset = UnderwaterDataset(input_dir, target_dir, val_indices,
-                                   image_size=image_size, augment=False)
+                                   image_size=image_size,
+                                   patches_per_image=1,  # Use single patch for validation
+                                   augment=False)
 
-    logger.info(f"Training samples: {len(train_dataset)}")
-    logger.info(f"Validation samples: {len(val_dataset)}")
+    logger.info(f"Training images: {train_dataset.num_images}")
+    logger.info(f"Training patches per epoch: {len(train_dataset)}")
+    logger.info(f"Validation images: {val_dataset.num_images}")
 
     # Create dataloaders
     # Disable pin_memory for MPS (not supported yet)
@@ -621,6 +655,9 @@ def main():
         logger.info(f"\nEpoch {epoch+1}/{args.epochs}")
         logger.info("-" * 80)
 
+        # Reshuffle random patches for this epoch (new random crops each epoch)
+        train_dataset.reshuffle_patches()
+
         # Train
         train_loss, train_psnr = train_epoch(model, train_loader, criterion, optimizer, device,
                                               scaler=scaler, use_amp=use_amp)
@@ -655,6 +692,7 @@ def main():
                 'resolution': resolution_str,
                 'batch_size': args.batch_size,
                 'image_size': image_size if image_size is not None else 4606,
+                'patches_per_image': patches_per_image,
                 'model': args.model,
                 'amp': use_amp,
                 'gradient_checkpointing': use_gradient_checkpointing,
@@ -719,6 +757,7 @@ def main():
         'training_config': {
             'resolution': resolution_str,
             'batch_size': args.batch_size,
+            'patches_per_image': patches_per_image,
             'epochs': len(train_losses),
             'model': args.model,
             'amp': use_amp,

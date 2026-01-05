@@ -26,6 +26,9 @@ cropping:
 # Training Configuration
 training:
   image_size: 512  # Training image size (patches)
+  patches_per_image: 4  # Number of random patches to extract per image per epoch (1-8)
+                        # Higher values = better coverage but more memory/time per epoch
+                        # Patches are re-randomized each epoch for maximum variety
   batch_size: 12  # Training batch size
   epochs: 150  # Number of training epochs
   learning_rate: 0.0002  # Learning rate
