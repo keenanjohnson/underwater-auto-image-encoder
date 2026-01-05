@@ -287,7 +287,7 @@ def train_epoch(model, dataloader, criterion, optimizer, device, scaler=None, us
 
             if use_amp and scaler is not None:
                 # Mixed precision forward pass
-                with autocast(device_type='cuda', dtype=torch.float16):
+                with autocast(device_type=device.type, dtype=torch.float16):
                     outputs = model(inputs)
                     loss = criterion(outputs, targets)
 
@@ -331,7 +331,7 @@ def validate_epoch(model, dataloader, criterion, device, use_amp=False):
                 inputs, targets = inputs.to(device), targets.to(device)
 
                 if use_amp:
-                    with autocast(device_type='cuda', dtype=torch.float16):
+                    with autocast(device_type=device.type, dtype=torch.float16):
                         outputs = model(inputs)
                         loss = criterion(outputs, targets)
                 else:
@@ -567,12 +567,12 @@ def main():
             logger.warning("torch.compile requested but not available (requires PyTorch 2.0+)")
             use_compile = False
 
-    # Mixed precision setup
-    use_amp = args.amp and device.type == 'cuda'
-    scaler = GradScaler('cuda') if use_amp else None
+    # Mixed precision setup (supports CUDA and MPS)
+    use_amp = args.amp and device.type in ('cuda', 'mps')
+    scaler = GradScaler(device.type) if use_amp else None
 
-    if args.amp and device.type != 'cuda':
-        logger.warning("AMP requested but not using CUDA - disabling mixed precision")
+    if args.amp and device.type not in ('cuda', 'mps'):
+        logger.warning("AMP requested but not using CUDA or MPS - disabling mixed precision")
     if use_amp:
         logger.info("Mixed precision (AMP) training: ENABLED")
         logger.info(f"Model size with FP16: ~{total_params * 2 / 1e6:.2f} MB")
