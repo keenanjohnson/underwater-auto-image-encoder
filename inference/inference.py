@@ -143,8 +143,14 @@ class Inferencer:
             logger.info(f"Using device: {self.device}")
         
         self.setup_model()
-        
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+
+        # Strip _orig_mod. prefix from torch.compile models
+        state_dict = checkpoint['model_state_dict']
+        if any(k.startswith('_orig_mod.') for k in state_dict.keys()):
+            logger.info("Stripping _orig_mod. prefix from compiled model checkpoint")
+            state_dict = {k.replace('_orig_mod.', ''): v for k, v in state_dict.items()}
+
+        self.model.load_state_dict(state_dict)
         self.model.eval()
         logger.info(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
         logger.info(f"Validation loss: {checkpoint.get('val_loss', 'N/A')}")
@@ -152,16 +158,43 @@ class Inferencer:
         self.setup_transforms()
 
     def _detect_model_type(self, checkpoint):
-        """Detect model type from checkpoint state dict keys"""
+        """Detect model type from checkpoint state dict keys or config"""
+        # First, check if model_config specifies the model type directly
+        model_config = checkpoint.get('model_config', {})
+        if 'model' in model_config:
+            model_type = model_config['model']
+            if model_type == 'ushape_transformer':
+                logger.info("Detected U-Shape Transformer model from checkpoint config")
+                return 'UShapeTransformer'
+            elif model_type == 'unet':
+                logger.info("Detected U-Net model from checkpoint config")
+                return 'UNetAutoencoder'
+
+        # Also check training_config for model type
+        training_config = checkpoint.get('training_config', {})
+        if 'model' in training_config:
+            model_type = training_config['model']
+            if model_type == 'ushape_transformer':
+                logger.info("Detected U-Shape Transformer model from training config")
+                return 'UShapeTransformer'
+            elif model_type == 'unet':
+                logger.info("Detected U-Net model from training config")
+                return 'UNetAutoencoder'
+
+        # Fallback: detect from state dict keys
         state_dict = checkpoint.get('model_state_dict', {})
 
+        # Strip _orig_mod. prefix from compiled models for detection
+        keys = [k.replace('_orig_mod.', '') for k in state_dict.keys()]
+
         # Check for U-Shape Transformer specific keys
-        if any(key.startswith('mtc.') for key in state_dict.keys()):
-            logger.info("Detected U-Shape Transformer model from checkpoint")
+        ushape_keys = ['linear_encoding', 'position_encoding', 'transformer', 'mtc.']
+        if any(any(key.startswith(uk) for uk in ushape_keys) for key in keys):
+            logger.info("Detected U-Shape Transformer model from checkpoint keys")
             return 'UShapeTransformer'
 
         # Check for Attention U-Net specific keys
-        if any('attention' in key.lower() for key in state_dict.keys()):
+        if any('attention' in key.lower() for key in keys):
             logger.info("Detected Attention U-Net model from checkpoint")
             return 'AttentionUNet'
 
