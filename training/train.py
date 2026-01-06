@@ -41,24 +41,38 @@ logger = logging.getLogger(__name__)
 
 
 class UnderwaterDataset(Dataset):
-    """Dataset that extracts random patches from full-resolution images"""
+    """Dataset that extracts patches from full-resolution images.
+
+    Supports two modes:
+    - Training: Random patches with augmentation
+    - Validation: Grid-based patches covering the entire image
+    """
 
     def __init__(self, input_dir, target_dir, file_indices, image_size=512,
-                 patches_per_image=1, augment=False):
+                 patches_per_image=1, augment=False, use_grid=False,
+                 grid_stride=None, image_width=4606, image_height=4030):
         """
         Args:
             input_dir: Directory with input images
             target_dir: Directory with target images
             file_indices: List of file indices to use
             image_size: Patch size to extract (e.g., 512 -> 512×512 patches)
-            patches_per_image: Number of random patches to extract per image per epoch
+            patches_per_image: Number of random patches per image (only for random mode)
             augment: Whether to apply augmentation (flips)
+            use_grid: If True, extract all patches in a grid pattern (for validation)
+            grid_stride: Stride for grid extraction (default: image_size for non-overlapping)
+            image_width: Expected image width (for grid calculation)
+            image_height: Expected image height (for grid calculation)
         """
         self.input_dir = Path(input_dir)
         self.target_dir = Path(target_dir)
         self.image_size = image_size
         self.patches_per_image = patches_per_image
         self.augment = augment
+        self.use_grid = use_grid
+        self.grid_stride = grid_stride if grid_stride is not None else image_size
+        self.image_width = image_width
+        self.image_height = image_height
 
         # Get all files with various image extensions
         input_extensions = ('.tiff', '.tif', '.TIFF', '.TIF')
@@ -75,34 +89,59 @@ class UnderwaterDataset(Dataset):
         self.target_files = [all_target_files[i] for i in valid_indices]
         self.num_images = len(self.input_files)
 
-        # Pre-generate random patch positions (re-randomize each epoch)
+        # Generate patch positions
         self.patch_positions = []
-        self._generate_patch_positions()
+        if self.use_grid:
+            self._generate_grid_positions()
+        else:
+            self._generate_random_positions()
 
         # Simple transforms (no resize - we extract patches directly)
         self.to_tensor = transforms.ToTensor()
 
-    def _generate_patch_positions(self):
-        """Generate random patch positions for all images.
-        Call this at the start of each epoch to get new random patches."""
+    def _generate_grid_positions(self):
+        """Generate grid patch positions covering each image."""
         self.patch_positions = []
+        patch_size = self.image_size
+        stride = self.grid_stride
 
+        # Calculate grid positions
+        for img_idx in range(self.num_images):
+            y = 0
+            while y + patch_size <= self.image_height:
+                x = 0
+                while x + patch_size <= self.image_width:
+                    self.patch_positions.append((img_idx, x, y))
+                    x += stride
+                y += stride
+
+        # Calculate patches per image for logging
+        patches_x = (self.image_width - patch_size) // stride + 1
+        patches_y = (self.image_height - patch_size) // stride + 1
+        self.patches_per_image_grid = patches_x * patches_y
+        logger.info(f"Grid validation: {patches_x}x{patches_y} = {self.patches_per_image_grid} patches per image")
+
+    def _generate_random_positions(self):
+        """Generate random patch positions for all images."""
+        self.patch_positions = []
         for img_idx in range(self.num_images):
             for _ in range(self.patches_per_image):
-                self.patch_positions.append(img_idx)
+                # Store just the image index; random x,y computed in __getitem__
+                self.patch_positions.append((img_idx, None, None))
 
     def reshuffle_patches(self):
         """Reshuffle patch positions for a new epoch.
-        Should be called at the start of each training epoch."""
-        self._generate_patch_positions()
-        logger.debug(f"Reshuffled patches: {len(self.patch_positions)} patches from {self.num_images} images")
+        Only applies to random mode; grid mode positions are fixed."""
+        if not self.use_grid:
+            self._generate_random_positions()
+            logger.debug(f"Reshuffled patches: {len(self.patch_positions)} patches from {self.num_images} images")
 
     def __len__(self):
         return len(self.patch_positions)
 
     def __getitem__(self, idx):
-        # Get the image index for this patch
-        img_idx = self.patch_positions[idx]
+        # Get the image index and position for this patch
+        img_idx, grid_x, grid_y = self.patch_positions[idx]
 
         # Load images
         input_path = self.input_dir / self.input_files[img_idx]
@@ -114,21 +153,25 @@ class UnderwaterDataset(Dataset):
         # Get image dimensions
         width, height = input_img.size
 
-        # Calculate valid crop region
+        # Calculate crop position
         if self.image_size is not None:
             patch_size = self.image_size
-            max_x = max(0, width - patch_size)
-            max_y = max(0, height - patch_size)
 
-            # Random crop position
-            x = np.random.randint(0, max_x + 1) if max_x > 0 else 0
-            y = np.random.randint(0, max_y + 1) if max_y > 0 else 0
+            if self.use_grid:
+                # Use pre-computed grid position
+                x, y = grid_x, grid_y
+            else:
+                # Random crop position
+                max_x = max(0, width - patch_size)
+                max_y = max(0, height - patch_size)
+                x = np.random.randint(0, max_x + 1) if max_x > 0 else 0
+                y = np.random.randint(0, max_y + 1) if max_y > 0 else 0
 
             # Extract the same patch from both images
             input_img = input_img.crop((x, y, x + patch_size, y + patch_size))
             target_img = target_img.crop((x, y, x + patch_size, y + patch_size))
 
-        # Apply augmentation
+        # Apply augmentation (only for training)
         if self.augment:
             # Random horizontal flip
             if np.random.random() > 0.5:
@@ -490,12 +533,13 @@ def main():
                                      augment=True)
     val_dataset = UnderwaterDataset(input_dir, target_dir, val_indices,
                                    image_size=image_size,
-                                   patches_per_image=1,  # Use single patch for validation
+                                   use_grid=True,  # Validate on all patches
                                    augment=False)
 
     logger.info(f"Training images: {train_dataset.num_images}")
     logger.info(f"Training patches per epoch: {len(train_dataset)}")
     logger.info(f"Validation images: {val_dataset.num_images}")
+    logger.info(f"Validation patches per epoch: {len(val_dataset)}")
 
     # Create dataloaders
     # Disable pin_memory for MPS (not supported yet)
