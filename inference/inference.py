@@ -143,8 +143,14 @@ class Inferencer:
             logger.info(f"Using device: {self.device}")
         
         self.setup_model()
-        
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+
+        # Handle torch.compile() models that have '_orig_mod.' prefix in state dict keys
+        state_dict = checkpoint['model_state_dict']
+        if any(key.startswith('_orig_mod.') for key in state_dict.keys()):
+            logger.info("Detected torch.compile() model, stripping '_orig_mod.' prefix from keys")
+            state_dict = {key.replace('_orig_mod.', ''): value for key, value in state_dict.items()}
+
+        self.model.load_state_dict(state_dict)
         self.model.eval()
         logger.info(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
         logger.info(f"Validation loss: {checkpoint.get('val_loss', 'N/A')}")
@@ -155,13 +161,16 @@ class Inferencer:
         """Detect model type from checkpoint state dict keys"""
         state_dict = checkpoint.get('model_state_dict', {})
 
+        # Strip '_orig_mod.' prefix if present (from torch.compile())
+        keys = [key.replace('_orig_mod.', '') for key in state_dict.keys()]
+
         # Check for U-Shape Transformer specific keys
-        if any(key.startswith('mtc.') for key in state_dict.keys()):
+        if any(key.startswith('mtc.') for key in keys):
             logger.info("Detected U-Shape Transformer model from checkpoint")
             return 'UShapeTransformer'
 
         # Check for Attention U-Net specific keys
-        if any('attention' in key.lower() for key in state_dict.keys()):
+        if any('attention' in key.lower() for key in keys):
             logger.info("Detected Attention U-Net model from checkpoint")
             return 'AttentionUNet'
 
