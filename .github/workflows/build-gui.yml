@@ -53,7 +53,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-universal-${{ hashFiles('**/requirements*.txt') }}
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('**/requirements*.txt', 'gui/features.py') }}
         restore-keys: |
           ${{ runner.os }}-pip-universal-
           ${{ runner.os }}-pip-
@@ -138,6 +138,14 @@ jobs:
         python --version
         pip --version
 
+    - name: Check GPR support feature flag
+      id: check-gpr
+      run: |
+        GPR_ENABLED=$(python -c "from gui.features import GPR_SUPPORT_ENABLED; print('true' if GPR_SUPPORT_ENABLED else 'false')")
+        echo "gpr_enabled=$GPR_ENABLED" >> $GITHUB_OUTPUT
+        echo "GPR Support Enabled: $GPR_ENABLED"
+      shell: bash
+
     - name: Install Python dependencies (Universal GPU/CPU Build)
       run: |
         python -m pip install --upgrade pip
@@ -154,17 +162,36 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
         fi
 
-        # Install other dependencies
-        pip install -r requirements_gui.txt
+        # Install other dependencies, excluding rawpy if GPR support is disabled
+        if [ "${{ steps.check-gpr.outputs.gpr_enabled }}" == "true" ]; then
+          echo "Installing all dependencies (GPR support enabled)..."
+          pip install -r requirements_gui.txt
+        else
+          echo "Installing dependencies without rawpy (GPR support disabled)..."
+          grep -v "^rawpy" requirements_gui.txt > requirements_gui_no_gpr.txt
+          pip install -r requirements_gui_no_gpr.txt
+          rm requirements_gui_no_gpr.txt
+        fi
 
         # Verify PyTorch installation
         python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
         python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
         python -c "import torch; print(f'MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, \"mps\") else False}')"
+
+        # Verify rawpy exclusion when GPR is disabled
+        if [ "${{ steps.check-gpr.outputs.gpr_enabled }}" == "false" ]; then
+          if python -c "import rawpy" 2>/dev/null; then
+            echo "ERROR: rawpy is installed but GPR support is disabled!"
+            pip uninstall -y rawpy
+            echo "Uninstalled rawpy"
+          else
+            echo "OK: rawpy is not installed (as expected)"
+          fi
+        fi
       shell: bash
 
     - name: Compile GPR tools (Linux/macOS)
-      if: matrix.os != 'windows-latest'
+      if: matrix.os != 'windows-latest' && steps.check-gpr.outputs.gpr_enabled == 'true'
       run: |
         echo "Compiling GPR tools from source..."
         chmod +x build_scripts/compile_gpr_tools.sh
@@ -173,25 +200,25 @@ jobs:
           echo "FATAL: GPR tools compilation failed"
           exit 1
         fi
-        
+
         # Verify binary exists and is valid
         if [ ! -f "${{ matrix.gpr_binary }}" ]; then
           echo "FATAL: GPR tools binary not found at expected location: ${{ matrix.gpr_binary }}"
           exit 1
         fi
-        
+
         # Check file size to ensure it's not a placeholder
         SIZE=$(stat -f%z "${{ matrix.gpr_binary }}" 2>/dev/null || stat -c%s "${{ matrix.gpr_binary }}")
         if [ "$SIZE" -lt 10000 ]; then
           echo "FATAL: GPR tools binary is too small ($SIZE bytes) - likely corrupted or placeholder"
           exit 1
         fi
-        
+
         echo "SUCCESS: GPR tools binary found and validated"
         ls -la "${{ matrix.gpr_binary }}"
 
     - name: Compile GPR tools (Windows)
-      if: matrix.os == 'windows-latest'
+      if: matrix.os == 'windows-latest' && steps.check-gpr.outputs.gpr_enabled == 'true'
       shell: cmd
       run: |
         echo Compiling GPR tools from source...
@@ -200,22 +227,27 @@ jobs:
           echo FATAL: GPR tools compilation failed with exit code %ERRORLEVEL%
           exit /b 1
         )
-        
+
         REM Verify the binary exists and is valid
         if not exist "${{ matrix.gpr_binary }}" (
           echo FATAL: GPR tools binary not found at expected location: ${{ matrix.gpr_binary }}
           exit /b 1
         )
-        
+
         REM Check file size to ensure it's not a placeholder
         for %%I in ("${{ matrix.gpr_binary }}") do set SIZE=%%~zI
         if %SIZE% LSS 10000 (
           echo FATAL: GPR tools binary is too small (%SIZE% bytes) - likely corrupted or placeholder
           exit /b 1
         )
-        
+
         echo SUCCESS: GPR tools binary found and validated
         dir "${{ matrix.gpr_binary }}"
+
+    - name: Skip GPR tools (disabled)
+      if: steps.check-gpr.outputs.gpr_enabled == 'false'
+      run: echo "GPR support is disabled - skipping GPR tools compilation"
+      shell: bash
 
     - name: Create placeholder icons
       run: |
@@ -254,6 +286,7 @@ jobs:
         python -c "import os; [print(os.path.join(r, f)) for r, d, files in os.walk('src') for f in sorted(files) if f.endswith('.py')]"
 
     - name: Verify GPR binary exists before PyInstaller
+      if: steps.check-gpr.outputs.gpr_enabled == 'true'
       run: |
         echo "Checking for GPR binary at: ${{ matrix.gpr_binary }}"
         if [ -f "${{ matrix.gpr_binary }}" ]; then

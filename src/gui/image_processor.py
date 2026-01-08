@@ -1,5 +1,5 @@
 """
-Image processor that handles GPR, TIFF, and JPEG inputs
+Image processor that handles TIFF and JPEG inputs (and optionally GPR)
 """
 from pathlib import Path
 import tempfile
@@ -10,18 +10,29 @@ import sys
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from src.converters.gpr_converter import GPRConverter
+# Import feature flags
+try:
+    from gui.features import GPR_SUPPORT_ENABLED
+except ImportError:
+    GPR_SUPPORT_ENABLED = False
+
+# Conditionally import GPR converter
+if GPR_SUPPORT_ENABLED:
+    from src.converters.gpr_converter import GPRConverter
+else:
+    GPRConverter = None
+
 from inference.inference import Inferencer
 
 logger = logging.getLogger(__name__)
 
 class ImageProcessor:
-    """Handles image processing with GPR support"""
-    
+    """Handles image processing with optional GPR support"""
+
     def __init__(self, model_path: str, config_path: str = None):
         """
         Initialize the image processor
-        
+
         Args:
             model_path: Path to the ML model checkpoint
             config_path: Optional path to config file
@@ -29,12 +40,16 @@ class ImageProcessor:
         self.model_path = model_path
         self.config_path = config_path
         self.inferencer = None
-        self.gpr_converter = GPRConverter()
-        
-        # Check if GPR support is available
-        self.gpr_support = GPRConverter.is_available()
-        if not self.gpr_support:
-            logger.warning("GPR support is not available - gpr_tools binary not found")
+
+        # GPR support - only available if feature is enabled and binary exists
+        if GPR_SUPPORT_ENABLED and GPRConverter is not None:
+            self.gpr_converter = GPRConverter()
+            self.gpr_support = GPRConverter.is_available()
+            if not self.gpr_support:
+                logger.warning("GPR support is not available - gpr_tools binary not found")
+        else:
+            self.gpr_converter = None
+            self.gpr_support = False
         
     def load_model(self):
         """Load the ML model - matching inference.py exactly"""
@@ -75,8 +90,9 @@ class ImageProcessor:
         self.load_model()
         
         # Check if input is GPR
-        if self.gpr_converter.is_gpr_file(input_path):
-            if not self.gpr_support:
+        is_gpr = self.gpr_converter.is_gpr_file(input_path) if self.gpr_converter else str(input_path).lower().endswith('.gpr')
+        if is_gpr:
+            if not self.gpr_support or not self.gpr_converter:
                 raise RuntimeError(
                     "GPR file detected but GPR support is not available. "
                     "The gpr_tools binary is missing from the bundled application."
@@ -206,7 +222,10 @@ class ImageProcessor:
     @staticmethod
     def get_supported_formats() -> list[str]:
         """Get list of supported input formats"""
-        return ['.gpr', '.tiff', '.tif', '.jpg', '.jpeg', '.png']
+        formats = ['.tiff', '.tif', '.jpg', '.jpeg', '.png']
+        if GPR_SUPPORT_ENABLED:
+            formats.insert(0, '.gpr')
+        return formats
 
     @staticmethod
     def filter_supported_files(files: list[Path]) -> list[Path]:
