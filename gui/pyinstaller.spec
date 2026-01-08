@@ -25,52 +25,66 @@ print(f"DEBUG: spec_dir (project root) = {spec_dir}")
 
 sys.path.insert(0, spec_dir)
 
+# Import feature flags
+from gui.features import GPR_SUPPORT_ENABLED
+
 block_cipher = None
+
+# Initialize binaries list
+binaries = []
 
 # Determine platform-specific binaries (relative to project root)
 system = platform.system().lower()
-if system == 'windows':
-    gpr_binary = (os.path.join(spec_dir, 'binaries/win32/gpr_tools.exe'), 'binaries/win32')
-elif system == 'darwin':
-    gpr_binary = (os.path.join(spec_dir, 'binaries/darwin/gpr_tools'), 'binaries/darwin')
-else:
-    gpr_binary = (os.path.join(spec_dir, 'binaries/linux/gpr_tools'), 'binaries/linux')
 
-# Debug: print what we're looking for
-print(f"\nProject root: {spec_dir}")
-print(f"Looking for binary at: {gpr_binary[0]}")
-print(f"Binary directory exists: {os.path.exists(os.path.dirname(gpr_binary[0]))}")
-if os.path.exists(os.path.dirname(gpr_binary[0])):
-    print(f"Contents of binary directory: {os.listdir(os.path.dirname(gpr_binary[0]))}")
-
-# Check if binary exists - REQUIRED for packaging
-binary_path = Path(gpr_binary[0])
-if not binary_path.exists():
-    print(f"\n" + "="*60)
-    print(f"FATAL ERROR: GPR tools binary not found!")
-    print(f"Expected location: {binary_path}")
-    print(f"\nThe gpr_tools binary MUST be compiled before packaging.")
-    print(f"Please run the appropriate build script:")
+# Only include GPR binaries if GPR support is enabled
+if GPR_SUPPORT_ENABLED:
     if system == 'windows':
-        print(f"  build_scripts\\compile_gpr_tools.bat")
+        gpr_binary = (os.path.join(spec_dir, 'binaries/win32/gpr_tools.exe'), 'binaries/win32')
+    elif system == 'darwin':
+        gpr_binary = (os.path.join(spec_dir, 'binaries/darwin/gpr_tools'), 'binaries/darwin')
     else:
-        print(f"  ./build_scripts/compile_gpr_tools.sh")
-    print("="*60 + "\n")
-    raise FileNotFoundError(f"Required gpr_tools binary not found at {binary_path}")
+        gpr_binary = (os.path.join(spec_dir, 'binaries/linux/gpr_tools'), 'binaries/linux')
 
-# Verify it's a valid executable (not a placeholder)
-file_size = binary_path.stat().st_size
-if file_size < 10000:  # Less than 10KB is definitely wrong
-    print(f"\n" + "="*60)
-    print(f"FATAL ERROR: GPR tools binary appears invalid!")
-    print(f"Binary path: {binary_path}")
-    print(f"File size: {file_size} bytes (expected > 10KB)")
-    print(f"The file may be corrupted or a placeholder.")
-    print("="*60 + "\n")
-    raise ValueError(f"Invalid gpr_tools binary at {binary_path} (size: {file_size} bytes)")
+    # Debug: print what we're looking for
+    print(f"\nProject root: {spec_dir}")
+    print(f"Looking for binary at: {gpr_binary[0]}")
+    print(f"Binary directory exists: {os.path.exists(os.path.dirname(gpr_binary[0]))}")
+    if os.path.exists(os.path.dirname(gpr_binary[0])):
+        print(f"Contents of binary directory: {os.listdir(os.path.dirname(gpr_binary[0]))}")
 
-print(f"✓ Found valid GPR tools binary: {binary_path} (size: {file_size:,} bytes)")
-binaries = [gpr_binary]
+    # Check if binary exists - REQUIRED for packaging when GPR is enabled
+    binary_path = Path(gpr_binary[0])
+    if not binary_path.exists():
+        print(f"\n" + "="*60)
+        print(f"FATAL ERROR: GPR tools binary not found!")
+        print(f"Expected location: {binary_path}")
+        print(f"\nThe gpr_tools binary MUST be compiled before packaging.")
+        print(f"Please run the appropriate build script:")
+        if system == 'windows':
+            print(f"  build_scripts\\compile_gpr_tools.bat")
+        else:
+            print(f"  ./build_scripts/compile_gpr_tools.sh")
+        print("="*60 + "\n")
+        raise FileNotFoundError(f"Required gpr_tools binary not found at {binary_path}")
+
+    # Verify it's a valid executable (not a placeholder)
+    file_size = binary_path.stat().st_size
+    if file_size < 10000:  # Less than 10KB is definitely wrong
+        print(f"\n" + "="*60)
+        print(f"FATAL ERROR: GPR tools binary appears invalid!")
+        print(f"Binary path: {binary_path}")
+        print(f"File size: {file_size} bytes (expected > 10KB)")
+        print(f"The file may be corrupted or a placeholder.")
+        print("="*60 + "\n")
+        raise ValueError(f"Invalid gpr_tools binary at {binary_path} (size: {file_size} bytes)")
+
+    print(f"✓ Found valid GPR tools binary: {binary_path} (size: {file_size:,} bytes)")
+    binaries = [gpr_binary]
+else:
+    print("\n" + "="*60)
+    print("GPR support is DISABLED - skipping GPR binary bundling")
+    print("To enable GPR support, set GPR_SUPPORT_ENABLED = True in gui/features.py")
+    print("="*60 + "\n")
 
 # Manually list all src modules since collect_submodules doesn't work in CI
 src_modules = [
@@ -79,12 +93,17 @@ src_modules = [
     'src.models.unet_autoencoder',
     'src.models.attention_unet',
     'src.utils',
-    'src.converters',
-    'src.converters.gpr_converter',
     'src.gui',
     'src.gui.main_window',
     'src.gui.image_processor',
 ]
+
+# Only include GPR converter module if GPR support is enabled
+if GPR_SUPPORT_ENABLED:
+    src_modules.extend([
+        'src.converters',
+        'src.converters.gpr_converter',
+    ])
 
 # Try to collect submodules, fallback to manual list
 try:

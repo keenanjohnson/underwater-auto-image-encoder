@@ -20,6 +20,12 @@ try:
 except ImportError:
     __version__ = "dev"
 
+# Import feature flags
+try:
+    from gui.features import GPR_SUPPORT_ENABLED
+except ImportError:
+    GPR_SUPPORT_ENABLED = False
+
 from src.gui.image_processor import ImageProcessor
 
 # Configure logging
@@ -328,10 +334,12 @@ class UnderwaterEnhancerApp(ctk.CTk):
         # Filter supported formats
         self.input_files = ImageProcessor.filter_supported_files(all_files)
         
-        # Count by type
-        gpr_count = len([f for f in self.input_files if f.suffix.lower() == '.gpr'])
-        other_count = len(self.input_files) - gpr_count
-        
+        # Count by type (only if GPR support is enabled)
+        if GPR_SUPPORT_ENABLED:
+            gpr_count = len([f for f in self.input_files if f.suffix.lower() == '.gpr'])
+        else:
+            gpr_count = 0
+
         # Update display
         total = len(self.input_files)
         if total > 0:
@@ -397,13 +405,14 @@ class UnderwaterEnhancerApp(ctk.CTk):
             # Config is optional - Inferencer creates default from checkpoint if not provided
             self.processor = ImageProcessor(model_path, config_path=None)
             
-            # Log GPR support status
-            if self.processor.gpr_support:
-                import platform
-                check = "[OK]" if platform.system() == "Windows" else "✓"
-                self.log(f"GPR support: Available {check}")
-            else:
-                self.log("GPR support: Not available (gpr_tools binary missing)")
+            # Log GPR support status (only if feature is enabled)
+            if GPR_SUPPORT_ENABLED:
+                if self.processor.gpr_support:
+                    import platform
+                    check = "[OK]" if platform.system() == "Windows" else "✓"
+                    self.log(f"GPR support: Available {check}")
+                else:
+                    self.log("GPR support: Not available (gpr_tools binary missing)")
             
             self.log("Loading model...")
             self.processor.load_model()
@@ -426,22 +435,23 @@ class UnderwaterEnhancerApp(ctk.CTk):
             # Process batch
             self.log(f"Starting batch processing of {len(self.input_files)} images...")
             
-            # Check for GPR files and GPR support
-            gpr_files = [f for f in self.input_files if f.suffix.lower() == '.gpr']
-            if gpr_files:
-                # Check if GPR support is available
-                if not self.processor.gpr_support:
-                    error_msg = (
-                        f"Cannot process {len(gpr_files)} GPR file(s).\n\n"
-                        "GPR support is not available - the gpr_tools binary is missing.\n"
-                        "Please rebuild the application with GPR support enabled."
-                    )
-                    self.log(f"Error: {error_msg}")
-                    messagebox.showerror("GPR Support Missing", error_msg)
-                    return
-                
-                self.log(f"Note: Processing {len(gpr_files)} GPR files at 4606×4030 resolution")
-                self.log("This may take several minutes per image...")
+            # Check for GPR files and GPR support (only if feature is enabled)
+            if GPR_SUPPORT_ENABLED:
+                gpr_files = [f for f in self.input_files if f.suffix.lower() == '.gpr']
+                if gpr_files:
+                    # Check if GPR support is available
+                    if not self.processor.gpr_support:
+                        error_msg = (
+                            f"Cannot process {len(gpr_files)} GPR file(s).\n\n"
+                            "GPR support is not available - the gpr_tools binary is missing.\n"
+                            "Please rebuild the application with GPR support enabled."
+                        )
+                        self.log(f"Error: {error_msg}")
+                        messagebox.showerror("GPR Support Missing", error_msg)
+                        return
+
+                    self.log(f"Note: Processing {len(gpr_files)} GPR files at 4606×4030 resolution")
+                    self.log("This may take several minutes per image...")
             
             results = self.processor.process_batch(
                 self.input_files,

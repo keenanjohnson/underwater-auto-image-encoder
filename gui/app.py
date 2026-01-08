@@ -82,10 +82,17 @@ def smoke_test():
     """Run smoke tests for CI validation"""
     print(f"Underwater Enhancer v{__version__}")
     print("Running smoke tests...")
-    
-    
+
+    # Import feature flags
+    try:
+        from gui.features import GPR_SUPPORT_ENABLED
+    except ImportError:
+        GPR_SUPPORT_ENABLED = False
+
+    print(f"  GPR Support: {'Enabled' if GPR_SUPPORT_ENABLED else 'Disabled'}")
+
     errors = []
-    
+
     # Test critical imports
     try:
         import torch
@@ -93,7 +100,7 @@ def smoke_test():
     except ImportError as e:
         errors.append(f"PyTorch import failed: {e}")
         print(f"  [FAIL] PyTorch: {e}")
-    
+
     try:
         import cv2
         print("  [OK] OpenCV imported")
@@ -104,35 +111,39 @@ def smoke_test():
         else:
             errors.append(f"OpenCV import failed: {e}")
             print(f"  [FAIL] OpenCV: {e}")
-    
+
     try:
         import customtkinter
         print("  [OK] CustomTkinter imported")
     except ImportError as e:
         errors.append(f"CustomTkinter import failed: {e}")
         print(f"  [FAIL] CustomTkinter: {e}")
-    
+
     try:
         from src.models.unet_autoencoder import UNetAutoencoder
         print("  [OK] Model imported")
     except ImportError as e:
         errors.append(f"Model import failed: {e}")
         print(f"  [FAIL] Model: {e}")
-    
-    try:
-        from src.converters.gpr_converter import GPRConverter
-        print("  [OK] GPR converter imported")
-    except ImportError as e:
-        errors.append(f"GPR converter import failed: {e}")
-        print(f"  [FAIL] GPR converter: {e}")
-    
+
+    # Only test GPR converter if GPR support is enabled
+    if GPR_SUPPORT_ENABLED:
+        try:
+            from src.converters.gpr_converter import GPRConverter
+            print("  [OK] GPR converter imported")
+        except ImportError as e:
+            errors.append(f"GPR converter import failed: {e}")
+            print(f"  [FAIL] GPR converter: {e}")
+    else:
+        print("  [SKIP] GPR converter (disabled)")
+
     try:
         from src.gui.main_window import UnderwaterEnhancerApp
         print("  [OK] GUI imported")
     except ImportError as e:
         errors.append(f"GUI import failed: {e}")
         print(f"  [FAIL] GUI: {e}")
-    
+
     if errors:
         print("\nSmoke test FAILED with errors:")
         for error in errors:
