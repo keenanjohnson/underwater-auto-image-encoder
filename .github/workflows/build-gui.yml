@@ -168,7 +168,9 @@ jobs:
           pip install -r requirements_gui.txt
         else
           echo "Installing dependencies without rawpy (GPR support disabled)..."
-          grep -v "^rawpy" requirements_gui.txt | pip install -r /dev/stdin
+          grep -v "^rawpy" requirements_gui.txt > requirements_gui_no_gpr.txt
+          pip install -r requirements_gui_no_gpr.txt
+          rm requirements_gui_no_gpr.txt
         fi
 
         # Verify PyTorch installation
