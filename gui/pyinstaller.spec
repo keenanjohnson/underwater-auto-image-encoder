@@ -164,7 +164,10 @@ a = Analysis(
         'pip',
         # Don't exclude ANY PyTorch or torchvision modules - they're too interdependent
         # Excluding torchvision modules causes operator registration errors
-    ],
+    ] + (
+        # Exclude GPR-related modules when GPR support is disabled
+        ['rawpy', 'src.converters', 'src.converters.gpr_converter'] if not GPR_SUPPORT_ENABLED else []
+    ),
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
