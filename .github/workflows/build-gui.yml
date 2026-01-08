@@ -138,6 +138,14 @@ jobs:
         python --version
         pip --version
 
+    - name: Check GPR support feature flag
+      id: check-gpr
+      run: |
+        GPR_ENABLED=$(python -c "from gui.features import GPR_SUPPORT_ENABLED; print('true' if GPR_SUPPORT_ENABLED else 'false')")
+        echo "gpr_enabled=$GPR_ENABLED" >> $GITHUB_OUTPUT
+        echo "GPR Support Enabled: $GPR_ENABLED"
+      shell: bash
+
     - name: Install Python dependencies (Universal GPU/CPU Build)
       run: |
         python -m pip install --upgrade pip
@@ -154,21 +162,19 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
         fi
 
-        # Install other dependencies
-        pip install -r requirements_gui.txt
+        # Install other dependencies, excluding rawpy if GPR support is disabled
+        if [ "${{ steps.check-gpr.outputs.gpr_enabled }}" == "true" ]; then
+          echo "Installing all dependencies (GPR support enabled)..."
+          pip install -r requirements_gui.txt
+        else
+          echo "Installing dependencies without rawpy (GPR support disabled)..."
+          grep -v "^rawpy" requirements_gui.txt | pip install -r /dev/stdin
+        fi
 
         # Verify PyTorch installation
         python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
         python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
         python -c "import torch; print(f'MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, \"mps\") else False}')"
-      shell: bash
-
-    - name: Check GPR support feature flag
-      id: check-gpr
-      run: |
-        GPR_ENABLED=$(python -c "from gui.features import GPR_SUPPORT_ENABLED; print('true' if GPR_SUPPORT_ENABLED else 'false')")
-        echo "gpr_enabled=$GPR_ENABLED" >> $GITHUB_OUTPUT
-        echo "GPR Support Enabled: $GPR_ENABLED"
       shell: bash
 
     - name: Compile GPR tools (Linux/macOS)
