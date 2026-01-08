@@ -53,7 +53,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-universal-${{ hashFiles('**/requirements*.txt') }}
+        key: ${{ runner.os }}-pip-universal-${{ hashFiles('**/requirements*.txt', 'gui/features.py') }}
         restore-keys: |
           ${{ runner.os }}-pip-universal-
           ${{ runner.os }}-pip-
@@ -177,6 +177,17 @@ jobs:
         python -c "import torch; print(f'PyTorch {torch.__version__} installed')"
         python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
         python -c "import torch; print(f'MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, \"mps\") else False}')"
+
+        # Verify rawpy exclusion when GPR is disabled
+        if [ "${{ steps.check-gpr.outputs.gpr_enabled }}" == "false" ]; then
+          if python -c "import rawpy" 2>/dev/null; then
+            echo "ERROR: rawpy is installed but GPR support is disabled!"
+            pip uninstall -y rawpy
+            echo "Uninstalled rawpy"
+          else
+            echo "OK: rawpy is not installed (as expected)"
+          fi
+        fi
       shell: bash
 
     - name: Compile GPR tools (Linux/macOS)
