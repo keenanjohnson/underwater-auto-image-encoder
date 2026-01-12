@@ -394,9 +394,10 @@ class Inferencer:
             elif model_type == 'SSUIEModel':
                 # SS-UIE requires exact H, W resolution for FFT weights
                 tile_size = self.config['model'].get('H', 256)
-                # Use smaller overlap for smaller tiles
-                overlap = min(overlap, tile_size // 4)
-                logger.info(f"SS-UIE: using tile_size={tile_size} (model H/W)")
+                # Use larger overlap for SS-UIE due to global receptive field (Mamba + FFT)
+                # This helps blend tile boundaries where global context discontinuities occur
+                overlap = max(overlap, tile_size // 3)  # ~170px for 512px tiles
+                logger.info(f"SS-UIE: using tile_size={tile_size} (model H/W) with {overlap}px overlap")
             else:
                 tile_size = 1024
 
@@ -429,8 +430,13 @@ class Inferencer:
                 tile = img.crop((x, y, x_end, y_end))
                 tile_original_size = tile.size
 
-                # For U-Shape Transformer, resize tile to exact model size if needed
-                if model_type == 'UShapeTransformer' and (tile_width != tile_size or tile_height != tile_size):
+                # For resolution-dependent models (U-Shape Transformer, SS-UIE), resize tile to exact model size
+                # SS-UIE has learnable FFT filters (K) that are resolution-specific
+                # U-Shape Transformer has fixed positional embeddings
+                needs_exact_resolution = model_type in ('UShapeTransformer', 'SSUIEModel')
+                tile_size_mismatch = (tile_width != tile_size or tile_height != tile_size)
+
+                if needs_exact_resolution and tile_size_mismatch:
                     # Resize to exact tile_size for model processing
                     tile_resized = tile.resize((tile_size, tile_size), Image.LANCZOS)
                     input_tensor = self.transform(tile_resized).unsqueeze(0).to(self.device)
@@ -443,6 +449,15 @@ class Inferencer:
 
                     # Resize back to original tile size
                     enhanced_tile = enhanced_tile_resized.resize(tile_original_size, Image.LANCZOS)
+                elif needs_exact_resolution:
+                    # Full-size tile for resolution-dependent models (no padding needed)
+                    input_tensor = self.transform(tile).unsqueeze(0).to(self.device)
+
+                    with torch.no_grad():
+                        output_tensor = self.model(input_tensor)
+
+                    output_tensor = output_tensor.squeeze(0).cpu()
+                    enhanced_tile = self.inverse_transform(output_tensor)
                 else:
                     # Standard processing with padding for U-Net models
                     input_tensor = self.transform(tile).unsqueeze(0).to(self.device)
