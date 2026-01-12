@@ -34,11 +34,24 @@ except ImportError:
 
 def _get_ss_uie_model():
     """Lazily import SS_UIE_model to avoid import errors when dependencies missing."""
+    import platform
+
     if not HAS_MAMBA:
-        raise ImportError(
-            "SS-UIE model requires mamba-ssm package (CUDA only). "
-            "Install with: pip install mamba-ssm causal-conv1d"
-        )
+        if platform.system() == 'Darwin':
+            raise ImportError(
+                "SS-UIE model is not available on macOS.\n\n"
+                "The SS-UIE model requires NVIDIA CUDA, which is not supported on macOS.\n"
+                "Please use a different model type (U-Net or U-Shape Transformer) on macOS,\n"
+                "or run SS-UIE inference on a Windows/Linux system with an NVIDIA GPU."
+            )
+        else:
+            raise ImportError(
+                "SS-UIE model requires mamba-ssm package (CUDA only).\n\n"
+                "This model requires an NVIDIA GPU with CUDA support.\n"
+                "Install with: pip install mamba-ssm causal-conv1d\n\n"
+                "If you don't have an NVIDIA GPU, please use a different model type\n"
+                "(U-Net or U-Shape Transformer)."
+            )
     if not HAS_DEPS:
         raise ImportError(
             "SS-UIE model requires timm and einops packages. "
@@ -129,3 +142,22 @@ class SSUIEModel(nn.Module):
 def is_ss_uie_available() -> bool:
     """Check if SS-UIE model dependencies are available."""
     return HAS_MAMBA and HAS_DEPS
+
+
+def get_ss_uie_unavailable_reason() -> str:
+    """Get a user-friendly reason why SS-UIE is not available."""
+    import platform
+
+    if platform.system() == 'Darwin':
+        return (
+            "SS-UIE is not available on macOS because it requires NVIDIA CUDA, "
+            "which is not supported on Apple hardware."
+        )
+    if not HAS_MAMBA:
+        return (
+            "SS-UIE requires the mamba-ssm package, which needs an NVIDIA GPU with CUDA. "
+            "Install with: pip install mamba-ssm causal-conv1d"
+        )
+    if not HAS_DEPS:
+        return "SS-UIE requires timm and einops packages. Install with: pip install timm einops"
+    return ""

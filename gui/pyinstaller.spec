@@ -78,6 +78,8 @@ src_modules = [
     'src.models',
     'src.models.unet_autoencoder',
     'src.models.attention_unet',
+    'src.models.ushape_transformer',
+    'src.models.ss_uie',
     'src.utils',
     'src.converters',
     'src.converters.gpr_converter',
@@ -85,6 +87,38 @@ src_modules = [
     'src.gui.main_window',
     'src.gui.image_processor',
 ]
+
+# SS-UIE dependencies (CUDA-only, not available on macOS)
+# These are conditionally added for Windows/Linux builds
+ss_uie_hiddenimports = []
+ss_uie_datas = []
+if system != 'darwin':
+    # SS-UIE requires mamba-ssm which is CUDA-only
+    ss_uie_hiddenimports = [
+        'mamba_ssm',
+        'mamba_ssm.ops',
+        'mamba_ssm.ops.selective_scan_interface',
+        'causal_conv1d',
+        'einops',
+        'einops.layers',
+        'einops.layers.torch',
+        'timm',
+        'timm.models',
+        'timm.layers',
+    ]
+    # Include the SS-UIE library files
+    ss_uie_lib_path = os.path.join(spec_dir, 'lib', 'SS-UIE')
+    if os.path.exists(ss_uie_lib_path):
+        for root, dirs, files in os.walk(ss_uie_lib_path):
+            for file in files:
+                if file.endswith('.py'):
+                    rel_root = os.path.relpath(root, spec_dir)
+                    ss_uie_datas.append((os.path.join(root, file), rel_root))
+        print(f"✓ Including SS-UIE library files ({len(ss_uie_datas)} files)")
+    else:
+        print(f"⚠ SS-UIE library not found at {ss_uie_lib_path}")
+else:
+    print("ℹ macOS build: SS-UIE support disabled (requires CUDA)")
 
 # Try to collect submodules, fallback to manual list
 try:
@@ -109,7 +143,7 @@ a = Analysis(
     [os.path.join(spec_dir, 'gui', 'app.py')],
     pathex=[spec_dir],  # Add absolute path to project root
     binaries=binaries,
-    datas=src_files,  # Include all Python files from src
+    datas=src_files + ss_uie_datas,  # Include all Python files from src and SS-UIE lib
     hiddenimports=[
         'customtkinter',
         'torch',
@@ -126,7 +160,7 @@ a = Analysis(
         'distutils.version',
         'setuptools._distutils',  # Compatibility layer for distutils
         'setuptools._distutils.version',
-    ] + src_hiddenimports,  # Add all src submodules
+    ] + src_hiddenimports + ss_uie_hiddenimports,  # Add all src submodules and SS-UIE deps
     hookspath=[os.path.join(spec_dir, 'gui')],  # Use gui hooks directory
     hooksconfig={},
     runtime_hooks=[os.path.join(spec_dir, 'gui', 'runtime_hook.py')],

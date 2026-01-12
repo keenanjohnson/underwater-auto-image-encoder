@@ -21,7 +21,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from src.models.unet_autoencoder import UNetAutoencoder, LightweightUNet
 from src.models.attention_unet import AttentionUNet
 from src.models.ushape_transformer import UShapeTransformer
-from src.models.ss_uie import SSUIEModel, is_ss_uie_available
+from src.models.ss_uie import SSUIEModel, is_ss_uie_available, get_ss_uie_unavailable_reason
 
 # Colab-compatible model blocks (matching exact architecture from notebook)
 class ColabDoubleConv(torch.nn.Module):
@@ -314,10 +314,8 @@ class Inferencer:
             self.model = AttentionUNet(**model_params)
         elif model_type == 'SSUIEModel':
             if not is_ss_uie_available():
-                raise ImportError(
-                    "SS-UIE model requires mamba-ssm package (CUDA only). "
-                    "Install with: pip install mamba-ssm causal-conv1d timm einops"
-                )
+                reason = get_ss_uie_unavailable_reason()
+                raise ImportError(f"Cannot load SS-UIE model: {reason}")
             model_params = {
                 'in_channels': self.config['model']['n_channels'],
                 'channels': self.config['model'].get('channels', 16),
