@@ -21,6 +21,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from src.models.unet_autoencoder import UNetAutoencoder, LightweightUNet
 from src.models.attention_unet import AttentionUNet
 from src.models.ushape_transformer import UShapeTransformer
+from src.models.ss_uie import SSUIEModel, is_ss_uie_available
 
 # Colab-compatible model blocks (matching exact architecture from notebook)
 class ColabDoubleConv(torch.nn.Module):
@@ -164,6 +165,11 @@ class Inferencer:
         # Strip '_orig_mod.' prefix if present (from torch.compile())
         keys = [key.replace('_orig_mod.', '') for key in state_dict.keys()]
 
+        # Check for SS-UIE specific keys (wrapped or unwrapped)
+        if any(key.startswith('model.dense_memory') or key.startswith('dense_memory') for key in keys):
+            logger.info("Detected SS-UIE model from checkpoint")
+            return 'SSUIEModel'
+
         # Check for U-Shape Transformer specific keys
         if any(key.startswith('mtc.') for key in keys):
             logger.info("Detected U-Shape Transformer model from checkpoint")
@@ -208,6 +214,16 @@ class Inferencer:
                     'hidden_dim': model_config.get('hidden_dim', 256),
                     'return_single': True  # Always return single output for inference
                 })
+            elif self.detected_model_type == 'SSUIEModel':
+                # SS-UIE uses H, W from ss_uie_H/W or falls back to image_size
+                img_size = model_config.get('ss_uie_H', model_config.get('image_size', 256))
+                config['model'].update({
+                    'H': img_size,
+                    'W': model_config.get('ss_uie_W', img_size),
+                    'channels': 16,
+                    'num_memblock': 6,
+                    'num_resblock': 6,
+                })
             else:
                 config['model'].update({
                     'base_features': 64,
@@ -241,6 +257,14 @@ class Inferencer:
                     'num_layers': 4,
                     'hidden_dim': 256,
                     'return_single': True
+                })
+            elif self.detected_model_type == 'SSUIEModel':
+                config['model'].update({
+                    'H': 256,
+                    'W': 256,
+                    'channels': 16,
+                    'num_memblock': 6,
+                    'num_resblock': 6,
                 })
             else:
                 config['model'].update({
@@ -288,6 +312,22 @@ class Inferencer:
         elif model_type == 'AttentionUNet':
             model_params['base_features'] = self.config['model']['base_features']
             self.model = AttentionUNet(**model_params)
+        elif model_type == 'SSUIEModel':
+            if not is_ss_uie_available():
+                raise ImportError(
+                    "SS-UIE model requires mamba-ssm package (CUDA only). "
+                    "Install with: pip install mamba-ssm causal-conv1d timm einops"
+                )
+            model_params = {
+                'in_channels': self.config['model']['n_channels'],
+                'channels': self.config['model'].get('channels', 16),
+                'num_memblock': self.config['model'].get('num_memblock', 6),
+                'num_resblock': self.config['model'].get('num_resblock', 6),
+                'drop_rate': 0.0,
+                'H': self.config['model'].get('H', 256),
+                'W': self.config['model'].get('W', 256),
+            }
+            self.model = SSUIEModel(**model_params)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
 
@@ -343,7 +383,7 @@ class Inferencer:
         original_size = img.size
         width, height = original_size
 
-        # For U-Shape Transformer, use the model's img_dim as tile size
+        # For U-Shape Transformer and SS-UIE, use the model's resolution as tile size
         model_type = self.config['model']['type']
         if tile_size is None:
             if model_type == 'UShapeTransformer':
@@ -351,6 +391,12 @@ class Inferencer:
                 # Use smaller overlap for smaller tiles
                 overlap = min(overlap, tile_size // 4)
                 logger.info(f"U-Shape Transformer: using tile_size={tile_size} (model img_dim)")
+            elif model_type == 'SSUIEModel':
+                # SS-UIE requires exact H, W resolution for FFT weights
+                tile_size = self.config['model'].get('H', 256)
+                # Use smaller overlap for smaller tiles
+                overlap = min(overlap, tile_size // 4)
+                logger.info(f"SS-UIE: using tile_size={tile_size} (model H/W)")
             else:
                 tile_size = 1024
 
@@ -487,6 +533,9 @@ class Inferencer:
             # For U-Shape Transformer, always use tiling to maintain max resolution
             # Use smaller threshold since tiles will be model's img_dim (typically 256)
             tile_threshold = self.config['model'].get('img_dim', 256)
+        elif model_type == 'SSUIEModel':
+            # For SS-UIE, use model's H (or W) as tile threshold
+            tile_threshold = self.config['model'].get('H', 256)
         else:
             # For U-Net models, use tiling for large images
             tile_threshold = 2048

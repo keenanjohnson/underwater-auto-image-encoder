@@ -31,6 +31,7 @@ from tqdm import tqdm
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.ushape_transformer import UShapeTransformer
+from src.models.ss_uie import SSUIEModel, is_ss_uie_available
 
 # Set up logging
 logging.basicConfig(
@@ -379,7 +380,7 @@ def main():
     parser.add_argument('--mse-weight', type=float, default=0.2, help='MSE loss weight (default: 0.2)')
 
     # Model selection
-    parser.add_argument('--model', type=str, default='unet', choices=['unet', 'ushape_transformer'],
+    parser.add_argument('--model', type=str, default='unet', choices=['unet', 'ushape_transformer', 'ss_uie'],
                        help='Model architecture (default: unet)')
 
     # Early stopping
@@ -518,6 +519,26 @@ def main():
         logger.info(f"Using U-shape Transformer model (img_dim={model_img_size})")
         if use_gradient_checkpointing:
             logger.info("Gradient checkpointing: ENABLED (memory-efficient mode)")
+    elif args.model == 'ss_uie':
+        # SS-UIE requires specific H, W at construction time
+        if not is_ss_uie_available():
+            logger.error("SS-UIE model requires mamba-ssm package (CUDA only).")
+            logger.error("Install with: pip install mamba-ssm causal-conv1d timm einops")
+            return
+
+        model_img_size = image_size if image_size is not None else 256
+        model = SSUIEModel(
+            in_channels=3,
+            channels=16,
+            num_memblock=6,
+            num_resblock=6,
+            drop_rate=0.0,
+            H=model_img_size,
+            W=model_img_size
+        ).to(device)
+        logger.info(f"Using SS-UIE model (H={model_img_size}, W={model_img_size})")
+        if use_gradient_checkpointing:
+            logger.warning("Gradient checkpointing requested but not yet implemented for SS-UIE model")
     else:
         model = UNetAutoencoder(n_channels=3, n_classes=3).to(device)
         logger.info("Using U-Net Autoencoder model")
@@ -683,6 +704,10 @@ def main():
                 'image_size': image_size if image_size is not None else 4606,
                 'model': args.model,
             }
+            # Add SS-UIE specific params if applicable
+            if args.model == 'ss_uie':
+                checkpoint['model_config']['ss_uie_H'] = model_img_size
+                checkpoint['model_config']['ss_uie_W'] = model_img_size
 
             torch.save(checkpoint, best_model_path)
             logger.info(f"✓ Saved best model: {best_model_path}")
@@ -702,14 +727,19 @@ def main():
 
     # Save final model
     final_model_path = output_dir / 'final_model.pth'
+    final_model_config = {
+        'n_channels': 3,
+        'n_classes': 3,
+        'image_size': image_size if image_size is not None else 4606,
+        'model': args.model,
+    }
+    # Add SS-UIE specific params if applicable
+    if args.model == 'ss_uie':
+        final_model_config['ss_uie_H'] = model_img_size
+        final_model_config['ss_uie_W'] = model_img_size
     final_checkpoint = {
         'model_state_dict': model.state_dict(),
-        'model_config': {
-            'n_channels': 3,
-            'n_classes': 3,
-            'image_size': image_size if image_size is not None else 4606,
-            'model': args.model,
-        },
+        'model_config': final_model_config,
         'training_history': {
             'train_losses': train_losses,
             'val_losses': val_losses,

@@ -249,8 +249,8 @@ Examples:
         '--model',
         type=str,
         default=None,
-        choices=['unet', 'ushape_transformer'],
-        help='Model architecture: unet or ushape_transformer'
+        choices=['unet', 'ushape_transformer', 'ss_uie'],
+        help='Model architecture: unet, ushape_transformer, or ss_uie'
     )
 
     parser.add_argument(
