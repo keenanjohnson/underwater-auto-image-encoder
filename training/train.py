@@ -222,6 +222,80 @@ class CombinedLoss(nn.Module):
         return self.alpha * l1 + self.beta * mse
 
 
+class SSUIECombinedLoss(nn.Module):
+    """SS-UIE paper loss function: SSIM + L1 + LAB + LCH + FDL
+
+    From the paper (train.py line 242):
+    loss_final = loss_ssim*10 + loss_RGB*10 + loss_lch + loss_lab*0.0001 + fdl_loss*10000
+    """
+    def __init__(self):
+        super().__init__()
+        # Add SS-UIE library paths for imports
+        ss_uie_path = Path(__file__).parent.parent / "lib" / "SS-UIE"
+        ss_uie_utils_path = ss_uie_path / "utils"
+        ss_uie_ssim_path = ss_uie_path / "pytorch-ssim-loss"
+
+        for path in [str(ss_uie_path), str(ss_uie_utils_path), str(ss_uie_ssim_path)]:
+            if path not in sys.path:
+                sys.path.insert(0, path)
+
+        # Import SS-UIE loss components
+        from pytorch_ssim import SSIM
+        from LAB import lab_Loss
+        from LCH import lch_Loss
+        from FDL import FDL
+
+        # Initialize loss components (matching paper settings)
+        self.ssim_loss = SSIM().cuda() if torch.cuda.is_available() else SSIM()
+        self.l1_loss = nn.L1Loss(reduction='none')
+        self.lab_loss = lab_Loss().cuda() if torch.cuda.is_available() else lab_Loss()
+        self.lch_loss = lch_Loss().cuda() if torch.cuda.is_available() else lch_Loss()
+        self.fdl_loss = FDL(
+            loss_weight=1.0,
+            alpha=2.0,
+            patch_factor=4,
+            ave_spectrum=True,
+            log_matrix=True,
+            batch_matrix=True
+        ).cuda() if torch.cuda.is_available() else FDL(
+            loss_weight=1.0, alpha=2.0, patch_factor=4,
+            ave_spectrum=True, log_matrix=True, batch_matrix=True
+        )
+
+        # Paper weights
+        self.ssim_weight = 10.0
+        self.l1_weight = 10.0
+        self.lch_weight = 1.0
+        self.lab_weight = 0.0001
+        self.fdl_weight = 10000.0
+
+    def forward(self, pred, target):
+        # SSIM loss (1 - SSIM, so lower is better)
+        loss_ssim = 1 - self.ssim_loss(pred, target)
+
+        # L1 loss (normalized by image size as in paper)
+        h, w = pred.shape[2], pred.shape[3]
+        loss_l1 = self.l1_loss(pred, target).sum() / (h * w)
+
+        # Color space losses
+        loss_lch = self.lch_loss(pred, target)
+        loss_lab = self.lab_loss(pred, target)
+
+        # Frequency domain loss
+        loss_fdl = self.fdl_loss(pred, target)
+
+        # Combined loss (paper formula)
+        total_loss = (
+            self.ssim_weight * loss_ssim +
+            self.l1_weight * loss_l1 +
+            self.lch_weight * loss_lch +
+            self.lab_weight * loss_lab +
+            self.fdl_weight * loss_fdl
+        )
+
+        return total_loss
+
+
 def calculate_psnr(img1, img2):
     """Calculate PSNR between two images"""
     mse = torch.mean((img1 - img2) ** 2)
@@ -530,8 +604,8 @@ def main():
         model = SSUIEModel(
             in_channels=3,
             channels=16,
-            num_memblock=6,
-            num_resblock=6,
+            num_memblock=4,  # Paper default
+            num_resblock=4,  # Paper default
             drop_rate=0.0,
             H=model_img_size,
             W=model_img_size
@@ -549,24 +623,40 @@ def main():
     logger.info(f"Model parameters: {total_params:,}")
     logger.info(f"Model size: {total_params * 4 / 1e6:.2f} MB (FP32)")
 
-    # Loss and optimizer
-    criterion = CombinedLoss(alpha=args.l1_weight, beta=args.mse_weight)
+    # Loss and optimizer - SS-UIE uses paper-specific multi-component loss
+    is_ss_uie = args.model == 'ss_uie'
+    if is_ss_uie:
+        criterion = SSUIECombinedLoss()
+        logger.info("Using SS-UIE paper loss: SSIM*10 + L1*10 + LCH + LAB*0.0001 + FDL*10000")
+    else:
+        criterion = CombinedLoss(alpha=args.l1_weight, beta=args.mse_weight)
 
-    # Select optimizer
+    # Select optimizer - SS-UIE uses different betas per paper
     use_8bit_optimizer = args.optimizer_8bit
+
+    # SS-UIE paper uses beta1=0.5 for faster adaptation (common in image restoration)
+    adam_betas = (0.5, 0.999) if is_ss_uie else (0.9, 0.999)
+
     if use_8bit_optimizer:
         if HAS_BITSANDBYTES:
-            optimizer = bnb.optim.Adam8bit(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
-            logger.info("Using 8-bit Adam optimizer (bitsandbytes)")
+            optimizer = bnb.optim.Adam8bit(model.parameters(), lr=args.lr, betas=adam_betas)
+            logger.info(f"Using 8-bit Adam optimizer (bitsandbytes) with betas={adam_betas}")
         else:
             logger.warning("8-bit optimizer requested but bitsandbytes not installed. Falling back to standard Adam.")
             logger.warning("Install with: pip install bitsandbytes")
-            optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+            optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=adam_betas)
             use_8bit_optimizer = False
     else:
-        optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+        optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=adam_betas)
+        if is_ss_uie:
+            logger.info(f"Using SS-UIE paper optimizer settings: Adam with betas={adam_betas}")
 
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+    # SS-UIE paper uses StepLR scheduler; other models use ReduceLROnPlateau
+    if is_ss_uie:
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=400, gamma=0.8)
+        logger.info("Using SS-UIE paper scheduler: StepLR(step_size=400, gamma=0.8)")
+    else:
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
     # torch.compile for PyTorch 2.0+ (deferred until after checkpoint loading)
     use_compile = args.compile
@@ -654,7 +744,11 @@ def main():
         val_psnrs.append(val_psnr)
 
         # Update learning rate
-        scheduler.step(val_loss)
+        # StepLR doesn't take metrics, ReduceLROnPlateau does
+        if is_ss_uie:
+            scheduler.step()
+        else:
+            scheduler.step(val_loss)
 
         logger.info(f"Train Loss: {train_loss:.4f}, Train PSNR: {train_psnr:.2f} dB")
         logger.info(f"Val Loss: {val_loss:.4f}, Val PSNR: {val_psnr:.2f} dB")
