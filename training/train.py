@@ -231,19 +231,20 @@ class SSUIECombinedLoss(nn.Module):
     def __init__(self):
         super().__init__()
         # Add SS-UIE library paths for imports
+        # Order matters: SS-UIE root must come first so 'from utils.X import Y' works
         ss_uie_path = Path(__file__).parent.parent / "lib" / "SS-UIE"
-        ss_uie_utils_path = ss_uie_path / "utils"
         ss_uie_ssim_path = ss_uie_path / "pytorch-ssim-loss"
 
-        for path in [str(ss_uie_path), str(ss_uie_utils_path), str(ss_uie_ssim_path)]:
+        # Add SS-UIE root first (for 'utils.ptcolor' etc), then ssim path
+        for path in [str(ss_uie_path), str(ss_uie_ssim_path)]:
             if path not in sys.path:
                 sys.path.insert(0, path)
 
         # Import SS-UIE loss components
         from pytorch_ssim import SSIM
-        from LAB import lab_Loss
-        from LCH import lch_Loss
-        from FDL import FDL
+        from utils.LAB import lab_Loss
+        from utils.LCH import lch_Loss
+        from utils.FDL import FDL
 
         # Initialize loss components (matching paper settings)
         self.ssim_loss = SSIM().cuda() if torch.cuda.is_available() else SSIM()
