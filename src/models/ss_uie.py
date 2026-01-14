@@ -132,10 +132,11 @@ class SSUIEModel(nn.Module):
         Returns:
             Enhanced image tensor of shape (B, C, H, W), values in [0, 1]
         """
-        # SS-UIE model returns raw output without sigmoid
+        # SS-UIE model uses residual learning: output = input + learned_residual
+        # The paper does NOT apply sigmoid - output is already in reasonable range
         out = self.model(x)
-        # Apply sigmoid for consistency with other models in this project
-        out = torch.sigmoid(out)
+        # Clamp to [0,1] for safety (handles any out-of-range values)
+        out = torch.clamp(out, 0.0, 1.0)
         return out
 
 

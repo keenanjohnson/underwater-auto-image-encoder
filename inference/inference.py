@@ -221,8 +221,8 @@ class Inferencer:
                     'H': img_size,
                     'W': model_config.get('ss_uie_W', img_size),
                     'channels': 16,
-                    'num_memblock': 6,
-                    'num_resblock': 6,
+                    'num_memblock': 4,  # Paper default
+                    'num_resblock': 4,  # Paper default
                 })
             else:
                 config['model'].update({
@@ -263,8 +263,8 @@ class Inferencer:
                     'H': 256,
                     'W': 256,
                     'channels': 16,
-                    'num_memblock': 6,
-                    'num_resblock': 6,
+                    'num_memblock': 4,  # Paper default
+                    'num_resblock': 4,  # Paper default
                 })
             else:
                 config['model'].update({
@@ -319,8 +319,8 @@ class Inferencer:
             model_params = {
                 'in_channels': self.config['model']['n_channels'],
                 'channels': self.config['model'].get('channels', 16),
-                'num_memblock': self.config['model'].get('num_memblock', 6),
-                'num_resblock': self.config['model'].get('num_resblock', 6),
+                'num_memblock': self.config['model'].get('num_memblock', 4),  # Paper default
+                'num_resblock': self.config['model'].get('num_resblock', 4),  # Paper default
                 'drop_rate': 0.0,
                 'H': self.config['model'].get('H', 256),
                 'W': self.config['model'].get('W', 256),
