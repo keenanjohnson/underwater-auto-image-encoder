@@ -270,6 +270,10 @@ class SSUIECombinedLoss(nn.Module):
         self.lab_weight = 0.0001
         self.fdl_weight = 10000.0
 
+        # Range penalty weight - penalizes outputs outside [0,1]
+        # This is NOT in the original paper but necessary since we removed sigmoid
+        self.range_weight = 100.0
+
     def forward(self, pred, target):
         # SSIM loss (1 - SSIM, so lower is better)
         loss_ssim = 1 - self.ssim_loss(pred, target)
@@ -285,13 +289,20 @@ class SSUIECombinedLoss(nn.Module):
         # Frequency domain loss
         loss_fdl = self.fdl_loss(pred, target)
 
-        # Combined loss (paper formula)
+        # Range penalty: penalize values outside [0,1]
+        # Uses ReLU to only penalize out-of-range values
+        below_zero = torch.relu(-pred)  # positive where pred < 0
+        above_one = torch.relu(pred - 1)  # positive where pred > 1
+        loss_range = (below_zero.mean() + above_one.mean())
+
+        # Combined loss (paper formula + range penalty)
         total_loss = (
             self.ssim_weight * loss_ssim +
             self.l1_weight * loss_l1 +
             self.lch_weight * loss_lch +
             self.lab_weight * loss_lab +
-            self.fdl_weight * loss_fdl
+            self.fdl_weight * loss_fdl +
+            self.range_weight * loss_range
         )
 
         return total_loss
