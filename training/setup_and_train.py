@@ -277,6 +277,19 @@ Examples:
         help='Use torch.compile for potential speedups and memory optimization (PyTorch 2.0+)'
     )
 
+    parser.add_argument(
+        '--random-crop',
+        action='store_true',
+        help='Use random crops at native resolution instead of resizing (preserves detail)'
+    )
+
+    parser.add_argument(
+        '--crops-per-image',
+        type=int,
+        default=None,
+        help='Number of random crops per image when --random-crop is enabled (default: 8)'
+    )
+
     # Step control
     parser.add_argument(
         '--skip-download',
@@ -359,6 +372,10 @@ Examples:
     use_optimizer_8bit = args.optimizer_8bit or training_config.get('optimizer_8bit', False)
     # Handle compile: CLI flag takes precedence (when True), then config, default False
     use_compile = args.compile or training_config.get('compile', False)
+    # Handle random_crop: CLI flag takes precedence (when True), then config, default False
+    use_random_crop = args.random_crop or training_config.get('random_crop', False)
+    # Crops per image (only used when random_crop is enabled)
+    crops_per_image = args.crops_per_image or training_config.get('crops_per_image', 8)
 
     # Step control
     steps_config = config.get('steps', {})
@@ -541,6 +558,10 @@ Examples:
 
     if use_compile:
         cmd.append('--compile')
+
+    if use_random_crop:
+        cmd.append('--random-crop')
+        cmd.extend(['--crops-per-image', str(crops_per_image)])
 
     run_command(cmd, "Train underwater enhancement model")
 

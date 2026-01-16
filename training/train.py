@@ -42,20 +42,27 @@ logger = logging.getLogger(__name__)
 
 
 class UnderwaterDataset(Dataset):
-    """Dataset that supports flexible image sizes including full-resolution"""
+    """Dataset that supports flexible image sizes and random cropping"""
 
-    def __init__(self, input_dir, target_dir, file_indices, image_size=512, augment=False):
+    def __init__(self, input_dir, target_dir, file_indices, image_size=512, augment=False,
+                 use_random_crop=False, crops_per_image=1):
         """
         Args:
             image_size: Target size. Can be:
                        - int: Square images (e.g., 512 -> 512×512)
                        - tuple: (width, height)
                        - None: Use original full size (no resize)
+            use_random_crop: If True, extract random crops instead of resizing.
+                            This preserves native resolution detail.
+            crops_per_image: Number of random crops per image (only used with use_random_crop=True).
+                            Higher values = more training data from each image.
         """
         self.input_dir = Path(input_dir)
         self.target_dir = Path(target_dir)
         self.image_size = image_size
         self.augment = augment
+        self.use_random_crop = use_random_crop
+        self.crops_per_image = crops_per_image if use_random_crop else 1
 
         # Get all files with various image extensions
         input_extensions = ('.tiff', '.tif', '.TIFF', '.TIF')
@@ -71,52 +78,91 @@ class UnderwaterDataset(Dataset):
         self.input_files = [all_input_files[i] for i in valid_indices]
         self.target_files = [all_target_files[i] for i in valid_indices]
 
-        # Define transforms based on image_size
-        if image_size is not None:
-            # Convert single int to tuple
-            if isinstance(image_size, int):
-                resize_size = (image_size, image_size)
-            else:
-                resize_size = image_size
+        # Convert image_size to tuple
+        if isinstance(image_size, int):
+            self.crop_size = (image_size, image_size)
+        else:
+            self.crop_size = image_size if image_size else (512, 512)
 
+        # Define transforms based on mode
+        if use_random_crop:
+            # Random crop mode: no resize, extract crops at native resolution
+            self.transform = transforms.ToTensor()
+        elif image_size is not None:
+            # Resize mode (original behavior)
             transform_list = [
-                transforms.Resize(resize_size),
+                transforms.Resize(self.crop_size),
                 transforms.ToTensor(),
             ]
+            self.transform = transforms.Compose(transform_list)
         else:
             # Full-size: no resizing
-            transform_list = [transforms.ToTensor()]
-
-        if augment:
-            # Add augmentation for training
-            self.transform = transforms.Compose([
-                transforms.RandomHorizontalFlip(p=0.5),
-                transforms.RandomVerticalFlip(p=0.5),
-                *transform_list
-            ])
-        else:
-            self.transform = transforms.Compose(transform_list)
+            self.transform = transforms.ToTensor()
 
     def __len__(self):
-        return len(self.input_files)
+        # Total samples = images × crops_per_image
+        return len(self.input_files) * self.crops_per_image
 
     def __getitem__(self, idx):
+        # Map index to file and crop number
+        file_idx = idx // self.crops_per_image
+        crop_idx = idx % self.crops_per_image
+
         # Load images
-        input_path = self.input_dir / self.input_files[idx]
-        target_path = self.target_dir / self.target_files[idx]
+        input_path = self.input_dir / self.input_files[file_idx]
+        target_path = self.target_dir / self.target_files[file_idx]
 
         input_img = Image.open(input_path).convert('RGB')
         target_img = Image.open(target_path).convert('RGB')
 
-        # Apply transforms
-        if self.augment:
-            # Apply same random transform to both images
+        if self.use_random_crop:
+            # Extract random crop at same position from both images
+            w, h = input_img.size
+            crop_w, crop_h = self.crop_size
+
+            # Random position (use idx-based seed for reproducibility within epoch)
+            # but different across epochs due to DataLoader shuffling
+            max_x = max(0, w - crop_w)
+            max_y = max(0, h - crop_h)
+
+            # Use a seed based on crop_idx to get different crops from same image
             seed = torch.randint(0, 2**32, (1,)).item()
             torch.manual_seed(seed)
+            x = torch.randint(0, max_x + 1, (1,)).item() if max_x > 0 else 0
+            y = torch.randint(0, max_y + 1, (1,)).item() if max_y > 0 else 0
+
+            # Crop both images at same position
+            input_img = input_img.crop((x, y, x + crop_w, y + crop_h))
+            target_img = target_img.crop((x, y, x + crop_w, y + crop_h))
+
+            # Apply augmentation if enabled
+            if self.augment:
+                # Random horizontal flip
+                if torch.rand(1).item() > 0.5:
+                    input_img = input_img.transpose(Image.FLIP_LEFT_RIGHT)
+                    target_img = target_img.transpose(Image.FLIP_LEFT_RIGHT)
+                # Random vertical flip
+                if torch.rand(1).item() > 0.5:
+                    input_img = input_img.transpose(Image.FLIP_TOP_BOTTOM)
+                    target_img = target_img.transpose(Image.FLIP_TOP_BOTTOM)
+
             input_img = self.transform(input_img)
-            torch.manual_seed(seed)
             target_img = self.transform(target_img)
         else:
+            # Original resize behavior
+            if self.augment:
+                # Apply same random transform to both images
+                seed = torch.randint(0, 2**32, (1,)).item()
+                torch.manual_seed(seed)
+                aug_transform = transforms.Compose([
+                    transforms.RandomHorizontalFlip(p=0.5),
+                    transforms.RandomVerticalFlip(p=0.5),
+                ])
+                torch.manual_seed(seed)
+                input_img = aug_transform(input_img)
+                torch.manual_seed(seed)
+                target_img = aug_transform(target_img)
+
             input_img = self.transform(input_img)
             target_img = self.transform(target_img)
 
@@ -451,6 +497,11 @@ def main():
     # Training arguments
     parser.add_argument('--image-size', type=int, default=1024,
                        help='Training image size (use 0 for full-size, default: 1024)')
+    parser.add_argument('--random-crop', action='store_true',
+                       help='Use random crops at native resolution instead of resizing. '
+                            'Preserves detail and gives more diverse training data.')
+    parser.add_argument('--crops-per-image', type=int, default=8,
+                       help='Number of random crops per image when --random-crop is enabled (default: 8)')
     parser.add_argument('--batch-size', type=int, default=16, help='Batch size (default: 16)')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs (default: 50)')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate (default: 1e-4)')
@@ -537,15 +588,28 @@ def main():
 
     # Create datasets
     image_size = None if args.image_size == 0 else args.image_size
-    resolution_str = "Full-size" if image_size is None else f"{image_size}×{image_size}"
+    use_random_crop = args.random_crop
+    crops_per_image = args.crops_per_image
 
-    logger.info(f"Training resolution: {resolution_str}")
+    if use_random_crop:
+        resolution_str = f"{image_size}×{image_size} random crops (native resolution)"
+        logger.info(f"Training mode: Random crops at native resolution")
+        logger.info(f"Crop size: {image_size}×{image_size}")
+        logger.info(f"Crops per image: {crops_per_image}")
+    else:
+        resolution_str = "Full-size" if image_size is None else f"{image_size}×{image_size}"
+        logger.info(f"Training resolution: {resolution_str}")
+
     logger.info(f"Batch size: {args.batch_size}")
 
     train_dataset = UnderwaterDataset(input_dir, target_dir, train_indices,
-                                     image_size=image_size, augment=True)
+                                     image_size=image_size, augment=True,
+                                     use_random_crop=use_random_crop,
+                                     crops_per_image=crops_per_image)
     val_dataset = UnderwaterDataset(input_dir, target_dir, val_indices,
-                                   image_size=image_size, augment=False)
+                                   image_size=image_size, augment=False,
+                                   use_random_crop=use_random_crop,
+                                   crops_per_image=1)  # Only 1 crop for validation
 
     logger.info(f"Training samples: {len(train_dataset)}")
     logger.info(f"Validation samples: {len(val_dataset)}")
