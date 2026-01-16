@@ -31,6 +31,7 @@ from tqdm import tqdm
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.ushape_transformer import UShapeTransformer
+from src.models.ss_uie import SSUIEModel, is_ss_uie_available
 
 # Set up logging
 logging.basicConfig(
@@ -41,20 +42,27 @@ logger = logging.getLogger(__name__)
 
 
 class UnderwaterDataset(Dataset):
-    """Dataset that supports flexible image sizes including full-resolution"""
+    """Dataset that supports flexible image sizes and random cropping"""
 
-    def __init__(self, input_dir, target_dir, file_indices, image_size=512, augment=False):
+    def __init__(self, input_dir, target_dir, file_indices, image_size=512, augment=False,
+                 use_random_crop=False, crops_per_image=1):
         """
         Args:
             image_size: Target size. Can be:
                        - int: Square images (e.g., 512 -> 512×512)
                        - tuple: (width, height)
                        - None: Use original full size (no resize)
+            use_random_crop: If True, extract random crops instead of resizing.
+                            This preserves native resolution detail.
+            crops_per_image: Number of random crops per image (only used with use_random_crop=True).
+                            Higher values = more training data from each image.
         """
         self.input_dir = Path(input_dir)
         self.target_dir = Path(target_dir)
         self.image_size = image_size
         self.augment = augment
+        self.use_random_crop = use_random_crop
+        self.crops_per_image = crops_per_image if use_random_crop else 1
 
         # Get all files with various image extensions
         input_extensions = ('.tiff', '.tif', '.TIFF', '.TIF')
@@ -70,52 +78,91 @@ class UnderwaterDataset(Dataset):
         self.input_files = [all_input_files[i] for i in valid_indices]
         self.target_files = [all_target_files[i] for i in valid_indices]
 
-        # Define transforms based on image_size
-        if image_size is not None:
-            # Convert single int to tuple
-            if isinstance(image_size, int):
-                resize_size = (image_size, image_size)
-            else:
-                resize_size = image_size
+        # Convert image_size to tuple
+        if isinstance(image_size, int):
+            self.crop_size = (image_size, image_size)
+        else:
+            self.crop_size = image_size if image_size else (512, 512)
 
+        # Define transforms based on mode
+        if use_random_crop:
+            # Random crop mode: no resize, extract crops at native resolution
+            self.transform = transforms.ToTensor()
+        elif image_size is not None:
+            # Resize mode (original behavior)
             transform_list = [
-                transforms.Resize(resize_size),
+                transforms.Resize(self.crop_size),
                 transforms.ToTensor(),
             ]
+            self.transform = transforms.Compose(transform_list)
         else:
             # Full-size: no resizing
-            transform_list = [transforms.ToTensor()]
-
-        if augment:
-            # Add augmentation for training
-            self.transform = transforms.Compose([
-                transforms.RandomHorizontalFlip(p=0.5),
-                transforms.RandomVerticalFlip(p=0.5),
-                *transform_list
-            ])
-        else:
-            self.transform = transforms.Compose(transform_list)
+            self.transform = transforms.ToTensor()
 
     def __len__(self):
-        return len(self.input_files)
+        # Total samples = images × crops_per_image
+        return len(self.input_files) * self.crops_per_image
 
     def __getitem__(self, idx):
+        # Map index to file and crop number
+        file_idx = idx // self.crops_per_image
+        crop_idx = idx % self.crops_per_image
+
         # Load images
-        input_path = self.input_dir / self.input_files[idx]
-        target_path = self.target_dir / self.target_files[idx]
+        input_path = self.input_dir / self.input_files[file_idx]
+        target_path = self.target_dir / self.target_files[file_idx]
 
         input_img = Image.open(input_path).convert('RGB')
         target_img = Image.open(target_path).convert('RGB')
 
-        # Apply transforms
-        if self.augment:
-            # Apply same random transform to both images
+        if self.use_random_crop:
+            # Extract random crop at same position from both images
+            w, h = input_img.size
+            crop_w, crop_h = self.crop_size
+
+            # Random position (use idx-based seed for reproducibility within epoch)
+            # but different across epochs due to DataLoader shuffling
+            max_x = max(0, w - crop_w)
+            max_y = max(0, h - crop_h)
+
+            # Use a seed based on crop_idx to get different crops from same image
             seed = torch.randint(0, 2**32, (1,)).item()
             torch.manual_seed(seed)
+            x = torch.randint(0, max_x + 1, (1,)).item() if max_x > 0 else 0
+            y = torch.randint(0, max_y + 1, (1,)).item() if max_y > 0 else 0
+
+            # Crop both images at same position
+            input_img = input_img.crop((x, y, x + crop_w, y + crop_h))
+            target_img = target_img.crop((x, y, x + crop_w, y + crop_h))
+
+            # Apply augmentation if enabled
+            if self.augment:
+                # Random horizontal flip
+                if torch.rand(1).item() > 0.5:
+                    input_img = input_img.transpose(Image.FLIP_LEFT_RIGHT)
+                    target_img = target_img.transpose(Image.FLIP_LEFT_RIGHT)
+                # Random vertical flip
+                if torch.rand(1).item() > 0.5:
+                    input_img = input_img.transpose(Image.FLIP_TOP_BOTTOM)
+                    target_img = target_img.transpose(Image.FLIP_TOP_BOTTOM)
+
             input_img = self.transform(input_img)
-            torch.manual_seed(seed)
             target_img = self.transform(target_img)
         else:
+            # Original resize behavior
+            if self.augment:
+                # Apply same random transform to both images
+                seed = torch.randint(0, 2**32, (1,)).item()
+                torch.manual_seed(seed)
+                aug_transform = transforms.Compose([
+                    transforms.RandomHorizontalFlip(p=0.5),
+                    transforms.RandomVerticalFlip(p=0.5),
+                ])
+                torch.manual_seed(seed)
+                input_img = aug_transform(input_img)
+                torch.manual_seed(seed)
+                target_img = aug_transform(target_img)
+
             input_img = self.transform(input_img)
             target_img = self.transform(target_img)
 
@@ -219,6 +266,92 @@ class CombinedLoss(nn.Module):
         l1 = self.l1_loss(pred, target)
         mse = self.mse_loss(pred, target)
         return self.alpha * l1 + self.beta * mse
+
+
+class SSUIECombinedLoss(nn.Module):
+    """SS-UIE paper loss function: SSIM + L1 + LAB + LCH + FDL
+
+    From the paper (train.py line 242):
+    loss_final = loss_ssim*10 + loss_RGB*10 + loss_lch + loss_lab*0.0001 + fdl_loss*10000
+    """
+    def __init__(self):
+        super().__init__()
+        # Add SS-UIE library paths for imports
+        # Order matters: SS-UIE root must come first so 'from utils.X import Y' works
+        ss_uie_path = Path(__file__).parent.parent / "lib" / "SS-UIE"
+        ss_uie_ssim_path = ss_uie_path / "pytorch-ssim-loss"
+
+        # Add SS-UIE root first (for 'utils.ptcolor' etc), then ssim path
+        for path in [str(ss_uie_path), str(ss_uie_ssim_path)]:
+            if path not in sys.path:
+                sys.path.insert(0, path)
+
+        # Import SS-UIE loss components
+        from pytorch_ssim import SSIM
+        from utils.LAB import lab_Loss
+        from utils.LCH import lch_Loss
+        from utils.FDL import FDL
+
+        # Initialize loss components (matching paper settings)
+        self.ssim_loss = SSIM().cuda() if torch.cuda.is_available() else SSIM()
+        self.l1_loss = nn.L1Loss(reduction='none')
+        self.lab_loss = lab_Loss().cuda() if torch.cuda.is_available() else lab_Loss()
+        self.lch_loss = lch_Loss().cuda() if torch.cuda.is_available() else lch_Loss()
+        self.fdl_loss = FDL(
+            loss_weight=1.0,
+            alpha=2.0,
+            patch_factor=4,
+            ave_spectrum=True,
+            log_matrix=True,
+            batch_matrix=True
+        ).cuda() if torch.cuda.is_available() else FDL(
+            loss_weight=1.0, alpha=2.0, patch_factor=4,
+            ave_spectrum=True, log_matrix=True, batch_matrix=True
+        )
+
+        # Paper weights
+        self.ssim_weight = 10.0
+        self.l1_weight = 10.0
+        self.lch_weight = 1.0
+        self.lab_weight = 0.0001
+        self.fdl_weight = 10000.0
+
+        # Range penalty weight - penalizes outputs outside [0,1]
+        # This is NOT in the original paper but necessary since we removed sigmoid
+        self.range_weight = 100.0
+
+    def forward(self, pred, target):
+        # SSIM loss (1 - SSIM, so lower is better)
+        loss_ssim = 1 - self.ssim_loss(pred, target)
+
+        # L1 loss (normalized by image size as in paper)
+        h, w = pred.shape[2], pred.shape[3]
+        loss_l1 = self.l1_loss(pred, target).sum() / (h * w)
+
+        # Color space losses
+        loss_lch = self.lch_loss(pred, target)
+        loss_lab = self.lab_loss(pred, target)
+
+        # Frequency domain loss
+        loss_fdl = self.fdl_loss(pred, target)
+
+        # Range penalty: penalize values outside [0,1]
+        # Uses ReLU to only penalize out-of-range values
+        below_zero = torch.relu(-pred)  # positive where pred < 0
+        above_one = torch.relu(pred - 1)  # positive where pred > 1
+        loss_range = (below_zero.mean() + above_one.mean())
+
+        # Combined loss (paper formula + range penalty)
+        total_loss = (
+            self.ssim_weight * loss_ssim +
+            self.l1_weight * loss_l1 +
+            self.lch_weight * loss_lch +
+            self.lab_weight * loss_lab +
+            self.fdl_weight * loss_fdl +
+            self.range_weight * loss_range
+        )
+
+        return total_loss
 
 
 def calculate_psnr(img1, img2):
@@ -364,6 +497,11 @@ def main():
     # Training arguments
     parser.add_argument('--image-size', type=int, default=1024,
                        help='Training image size (use 0 for full-size, default: 1024)')
+    parser.add_argument('--random-crop', action='store_true',
+                       help='Use random crops at native resolution instead of resizing. '
+                            'Preserves detail and gives more diverse training data.')
+    parser.add_argument('--crops-per-image', type=int, default=8,
+                       help='Number of random crops per image when --random-crop is enabled (default: 8)')
     parser.add_argument('--batch-size', type=int, default=16, help='Batch size (default: 16)')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs (default: 50)')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate (default: 1e-4)')
@@ -379,7 +517,7 @@ def main():
     parser.add_argument('--mse-weight', type=float, default=0.2, help='MSE loss weight (default: 0.2)')
 
     # Model selection
-    parser.add_argument('--model', type=str, default='unet', choices=['unet', 'ushape_transformer'],
+    parser.add_argument('--model', type=str, default='unet', choices=['unet', 'ushape_transformer', 'ss_uie'],
                        help='Model architecture (default: unet)')
 
     # Early stopping
@@ -450,15 +588,28 @@ def main():
 
     # Create datasets
     image_size = None if args.image_size == 0 else args.image_size
-    resolution_str = "Full-size" if image_size is None else f"{image_size}×{image_size}"
+    use_random_crop = args.random_crop
+    crops_per_image = args.crops_per_image
 
-    logger.info(f"Training resolution: {resolution_str}")
+    if use_random_crop:
+        resolution_str = f"{image_size}×{image_size} random crops (native resolution)"
+        logger.info(f"Training mode: Random crops at native resolution")
+        logger.info(f"Crop size: {image_size}×{image_size}")
+        logger.info(f"Crops per image: {crops_per_image}")
+    else:
+        resolution_str = "Full-size" if image_size is None else f"{image_size}×{image_size}"
+        logger.info(f"Training resolution: {resolution_str}")
+
     logger.info(f"Batch size: {args.batch_size}")
 
     train_dataset = UnderwaterDataset(input_dir, target_dir, train_indices,
-                                     image_size=image_size, augment=True)
+                                     image_size=image_size, augment=True,
+                                     use_random_crop=use_random_crop,
+                                     crops_per_image=crops_per_image)
     val_dataset = UnderwaterDataset(input_dir, target_dir, val_indices,
-                                   image_size=image_size, augment=False)
+                                   image_size=image_size, augment=False,
+                                   use_random_crop=use_random_crop,
+                                   crops_per_image=1)  # Only 1 crop for validation
 
     logger.info(f"Training samples: {len(train_dataset)}")
     logger.info(f"Validation samples: {len(val_dataset)}")
@@ -518,6 +669,26 @@ def main():
         logger.info(f"Using U-shape Transformer model (img_dim={model_img_size})")
         if use_gradient_checkpointing:
             logger.info("Gradient checkpointing: ENABLED (memory-efficient mode)")
+    elif args.model == 'ss_uie':
+        # SS-UIE requires specific H, W at construction time
+        if not is_ss_uie_available():
+            logger.error("SS-UIE model requires mamba-ssm package (CUDA only).")
+            logger.error("Install with: pip install mamba-ssm causal-conv1d timm einops")
+            return
+
+        model_img_size = image_size if image_size is not None else 256
+        model = SSUIEModel(
+            in_channels=3,
+            channels=16,
+            num_memblock=4,  # Paper default
+            num_resblock=4,  # Paper default
+            drop_rate=0.0,
+            H=model_img_size,
+            W=model_img_size
+        ).to(device)
+        logger.info(f"Using SS-UIE model (H={model_img_size}, W={model_img_size})")
+        if use_gradient_checkpointing:
+            logger.warning("Gradient checkpointing requested but not yet implemented for SS-UIE model")
     else:
         model = UNetAutoencoder(n_channels=3, n_classes=3).to(device)
         logger.info("Using U-Net Autoencoder model")
@@ -528,24 +699,40 @@ def main():
     logger.info(f"Model parameters: {total_params:,}")
     logger.info(f"Model size: {total_params * 4 / 1e6:.2f} MB (FP32)")
 
-    # Loss and optimizer
-    criterion = CombinedLoss(alpha=args.l1_weight, beta=args.mse_weight)
+    # Loss and optimizer - SS-UIE uses paper-specific multi-component loss
+    is_ss_uie = args.model == 'ss_uie'
+    if is_ss_uie:
+        criterion = SSUIECombinedLoss()
+        logger.info("Using SS-UIE paper loss: SSIM*10 + L1*10 + LCH + LAB*0.0001 + FDL*10000")
+    else:
+        criterion = CombinedLoss(alpha=args.l1_weight, beta=args.mse_weight)
 
-    # Select optimizer
+    # Select optimizer - SS-UIE uses different betas per paper
     use_8bit_optimizer = args.optimizer_8bit
+
+    # SS-UIE paper uses beta1=0.5 for faster adaptation (common in image restoration)
+    adam_betas = (0.5, 0.999) if is_ss_uie else (0.9, 0.999)
+
     if use_8bit_optimizer:
         if HAS_BITSANDBYTES:
-            optimizer = bnb.optim.Adam8bit(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
-            logger.info("Using 8-bit Adam optimizer (bitsandbytes)")
+            optimizer = bnb.optim.Adam8bit(model.parameters(), lr=args.lr, betas=adam_betas)
+            logger.info(f"Using 8-bit Adam optimizer (bitsandbytes) with betas={adam_betas}")
         else:
             logger.warning("8-bit optimizer requested but bitsandbytes not installed. Falling back to standard Adam.")
             logger.warning("Install with: pip install bitsandbytes")
-            optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+            optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=adam_betas)
             use_8bit_optimizer = False
     else:
-        optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+        optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=adam_betas)
+        if is_ss_uie:
+            logger.info(f"Using SS-UIE paper optimizer settings: Adam with betas={adam_betas}")
 
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+    # SS-UIE paper uses StepLR scheduler; other models use ReduceLROnPlateau
+    if is_ss_uie:
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=400, gamma=0.8)
+        logger.info("Using SS-UIE paper scheduler: StepLR(step_size=400, gamma=0.8)")
+    else:
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
     # torch.compile for PyTorch 2.0+ (deferred until after checkpoint loading)
     use_compile = args.compile
@@ -633,7 +820,11 @@ def main():
         val_psnrs.append(val_psnr)
 
         # Update learning rate
-        scheduler.step(val_loss)
+        # StepLR doesn't take metrics, ReduceLROnPlateau does
+        if is_ss_uie:
+            scheduler.step()
+        else:
+            scheduler.step(val_loss)
 
         logger.info(f"Train Loss: {train_loss:.4f}, Train PSNR: {train_psnr:.2f} dB")
         logger.info(f"Val Loss: {val_loss:.4f}, Val PSNR: {val_psnr:.2f} dB")
@@ -683,6 +874,10 @@ def main():
                 'image_size': image_size if image_size is not None else 4606,
                 'model': args.model,
             }
+            # Add SS-UIE specific params if applicable
+            if args.model == 'ss_uie':
+                checkpoint['model_config']['ss_uie_H'] = model_img_size
+                checkpoint['model_config']['ss_uie_W'] = model_img_size
 
             torch.save(checkpoint, best_model_path)
             logger.info(f"✓ Saved best model: {best_model_path}")
@@ -702,14 +897,19 @@ def main():
 
     # Save final model
     final_model_path = output_dir / 'final_model.pth'
+    final_model_config = {
+        'n_channels': 3,
+        'n_classes': 3,
+        'image_size': image_size if image_size is not None else 4606,
+        'model': args.model,
+    }
+    # Add SS-UIE specific params if applicable
+    if args.model == 'ss_uie':
+        final_model_config['ss_uie_H'] = model_img_size
+        final_model_config['ss_uie_W'] = model_img_size
     final_checkpoint = {
         'model_state_dict': model.state_dict(),
-        'model_config': {
-            'n_channels': 3,
-            'n_classes': 3,
-            'image_size': image_size if image_size is not None else 4606,
-            'model': args.model,
-        },
+        'model_config': final_model_config,
         'training_history': {
             'train_losses': train_losses,
             'val_losses': val_losses,
