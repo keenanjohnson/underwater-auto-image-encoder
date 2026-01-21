@@ -195,6 +195,10 @@ class TestInferenceCLI:
 
         assert result.returncode == 0, f"CLI failed: {result.stderr}"
 
+        # Verify at least one output file was created
+        output_files = list(output_dir.glob("*_enhanced.*"))
+        assert len(output_files) >= 1, "No output files were created"
+
 
 class TestOutputConsistency:
     """Test that model outputs are consistent and valid"""
