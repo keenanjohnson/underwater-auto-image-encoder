@@ -3,7 +3,6 @@ Pytest fixtures for inference testing
 """
 
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
