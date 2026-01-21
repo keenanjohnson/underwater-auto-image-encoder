@@ -151,6 +151,11 @@ class Inferencer:
             logger.info("Detected torch.compile() model, stripping '_orig_mod.' prefix from keys")
             state_dict = {key.replace('_orig_mod.', ''): value for key, value in state_dict.items()}
 
+        # Handle legacy U-Shape Transformer checkpoints that used 'transformer.net' instead of 'transformer.layers'
+        if any(key.startswith('transformer.net.') for key in state_dict.keys()):
+            logger.info("Detected legacy checkpoint, remapping 'transformer.net' to 'transformer.layers'")
+            state_dict = {key.replace('transformer.net.', 'transformer.layers.'): value for key, value in state_dict.items()}
+
         self.model.load_state_dict(state_dict)
         self.model.eval()
         logger.info(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
