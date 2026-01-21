@@ -238,6 +238,10 @@ class Inferencer:
             return config
         else:
             # Fallback config for basic Colab checkpoints
+            # Check for training_config which older checkpoints may have
+            training_config = checkpoint.get('training_config', {})
+            image_size = training_config.get('image_size', 256)
+
             config = {
                 'model': {
                     'type': self.detected_model_type,
@@ -245,7 +249,7 @@ class Inferencer:
                     'n_classes': 3,
                 },
                 'data': {
-                    'image_size': [256, 256]
+                    'image_size': [image_size, image_size]
                 },
                 'inference': {
                     'resize_inference': True
@@ -255,7 +259,7 @@ class Inferencer:
             # Add model-specific parameters
             if self.detected_model_type == 'UShapeTransformer':
                 config['model'].update({
-                    'img_dim': 256,
+                    'img_dim': image_size,
                     'patch_dim': 16,
                     'embedding_dim': 512,
                     'num_heads': 8,
@@ -265,8 +269,8 @@ class Inferencer:
                 })
             elif self.detected_model_type == 'SSUIEModel':
                 config['model'].update({
-                    'H': 256,
-                    'W': 256,
+                    'H': image_size,
+                    'W': image_size,
                     'channels': 16,
                     'num_memblock': 4,  # Paper default
                     'num_resblock': 4,  # Paper default
